@@ -27,8 +27,10 @@ Kirana shopkeeper at the counter — keyboard-first, fast, Telugu-reading, print
 - Daily Report: cash/UPI/card/khata totals, bill count, gross, khata collected, cash in hand, top items, bill list, print CSS.
 - Tested: backend 7/7 pytest, all frontend flows, mobile responsive at 390x844.
 
+- Bill History (2026-06): date-range + search by bill number / customer / item code-name, bill detail panel, thermal reprint of any old bill. Backend `GET /api/bills?from_day&to_day&q` and `GET /api/bills/{id}`.
+
 ## Backlog
-- P1: Bill history search / edit-reprint old bills; WhatsApp/SMS bill share; per-customer khata statement print.
+- P1: WhatsApp/SMS bill share; per-customer khata statement print.
 - P1: Barcode scanner input; stock/inventory tracking with low-stock alerts.
 - P2: Multi-user login for staff; GST/tax breakdown; weekly & monthly reports with charts; export report to CSV/PDF.
 - P2: Expand transliteration dictionary for more grocery words; custom on-screen Telugu keyboard.

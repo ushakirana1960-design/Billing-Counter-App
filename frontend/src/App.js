@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
 import { Toaster } from "sonner";
-import { ShoppingBasket, Tags, Upload, NotebookPen, BarChart3 } from "lucide-react";
+import { ShoppingBasket, Tags, Upload, NotebookPen, BarChart3, ReceiptText } from "lucide-react";
+import BillHistory from "@/pages/BillHistory";
 import Billing from "@/pages/Billing";
 import Items from "@/pages/Items";
 import PriceImport from "@/pages/PriceImport";
@@ -12,6 +13,7 @@ const NAV = [
   { to: "/items", label: "వస్తువులు", icon: Tags, id: "nav-items" },
   { to: "/import", label: "రేట్లు అప్‌డేట్", icon: Upload, id: "nav-import" },
   { to: "/khata", label: "ఖాతా", icon: NotebookPen, id: "nav-khata" },
+  { to: "/history", label: "పాత బిల్లులు", icon: ReceiptText, id: "nav-history" },
   { to: "/report", label: "రోజు నివేదిక", icon: BarChart3, id: "nav-report" },
 ];
 
@@ -61,6 +63,7 @@ export default function App() {
           <Route path="/items" element={<Items />} />
           <Route path="/import" element={<PriceImport />} />
           <Route path="/khata" element={<Khata />} />
+          <Route path="/history" element={<BillHistory />} />
           <Route path="/report" element={<Report />} />
         </Routes>
       </Shell>

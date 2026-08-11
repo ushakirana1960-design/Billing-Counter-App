@@ -13,6 +13,7 @@ export const api = {
   ledger: (id) => axios.get(`${API}/customers/${id}/ledger`).then((r) => r.data),
   pay: (id, d) => axios.post(`${API}/customers/${id}/payment`, d).then((r) => r.data),
   createBill: (d) => axios.post(`${API}/bills`, d).then((r) => r.data),
+  bills: (params) => axios.get(`${API}/bills`, { params }).then((r) => r.data),
   report: (day) => axios.get(`${API}/report/daily`, { params: { day } }).then((r) => r.data),
   seed: () => axios.post(`${API}/seed`).then((r) => r.data),
 };

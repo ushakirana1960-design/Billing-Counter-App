@@ -251,11 +251,36 @@ async def create_bill(payload: BillIn):
 
 
 @api_router.get("/bills", response_model=List[Bill])
-async def list_bills(day: Optional[str] = None):
-    q = {}
+async def list_bills(day: Optional[str] = None, from_day: Optional[str] = None,
+                     to_day: Optional[str] = None, q: Optional[str] = None):
+    query = {}
     if day:
-        q = {"created_at": {"$gte": f"{day}T00:00:00", "$lte": f"{day}T23:59:59.999999+00:00"}}
-    return await db.bills.find(q, NO_ID).sort("bill_no", -1).to_list(500)
+        query["created_at"] = {"$gte": f"{day}T00:00:00", "$lte": f"{day}T23:59:59.999999+00:00"}
+    elif from_day or to_day:
+        rng = {}
+        if from_day:
+            rng["$gte"] = f"{from_day}T00:00:00"
+        if to_day:
+            rng["$lte"] = f"{to_day}T23:59:59.999999+00:00"
+        query["created_at"] = rng
+    bills = await db.bills.find(query, NO_ID).sort("bill_no", -1).to_list(1000)
+    if q:
+        s = q.strip().lower()
+        bills = [
+            b for b in bills
+            if s == str(b["bill_no"])
+            or s in (b.get("customer_name") or "").lower()
+            or any(s in l["name_te"].lower() or s == l["code"] for l in b["lines"])
+        ]
+    return bills[:300]
+
+
+@api_router.get("/bills/{bill_id}", response_model=Bill)
+async def get_bill(bill_id: str):
+    doc = await db.bills.find_one({"id": bill_id}, NO_ID)
+    if not doc:
+        raise HTTPException(404, "బిల్లు కనబడలేదు")
+    return doc
 
 
 @api_router.get("/report/daily")
