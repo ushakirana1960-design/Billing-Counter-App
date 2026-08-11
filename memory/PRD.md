@@ -46,6 +46,10 @@ Kirana shopkeeper at the counter — keyboard-first, fast, Telugu-reading, print
 - Weekly report (2026-06): `GET /api/report/weekly?week_start=YYYY-MM-DD` (Monday-based) → 7-day item × day quantity matrix, day totals/counts, payment-mode split, daily average, best day. Page `/week` with prev/next week navigation and print.
 - Verified iteration 5: backend 22/22 pytest, frontend 100% (all 9 routes compile, mobile-safe at 390px, e2e smoke pass). LAUNCH-READY, awaiting user go-ahead.
 
+- Bill accountability (2026-06): up to 7 staff names in Settings (`Shop.staff`), `billed-by-select` on Billing (remembered in localStorage), `Bill.billed_by` printed on the receipt as "బిల్లు వేసినవారు" plus blank "పరిశీలించినవారు" and "కస్టమర్ సంతకం" signature lines; per-staff totals in daily report (`by_staff`) and a column in bill history.
+- Shop logo/symbol: uploaded in Settings, resized client-side to 320px PNG data URL, stored in `Shop.logo`, shown in the app header and printed at the top of every receipt.
+- Pre-launch hardening: CORS via `allow_origin_regex` when `CORS_ORIGINS="*"` (works on any production domain with cookie auth), bulk_price and stock decrement now use single `bulk_write`/`insert_many` calls (N+1 removed). Deployment check: PASS, `yarn build` succeeds.
+
 ## Backlog
 - P1: WhatsApp/SMS bill share; per-customer khata statement print.
 - P1: Barcode scanner input; stock/inventory tracking with low-stock alerts.

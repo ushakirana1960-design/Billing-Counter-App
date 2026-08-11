@@ -301,6 +301,63 @@ class TestStatement:
         assert round(s["opening"] + s["billed"] - s["paid"], 2) == round(s["closing"], 2)
 
 
+# ---------- Staff + Logo settings + billed_by ----------
+class TestStaffLogoBilledBy:
+    def test_settings_persists_staff_and_logo(self, client):
+        current = client.get(f"{API}/settings").json()
+        payload = {**current,
+                   "staff": ["యజమాని", "రవి", "శ్రీను"],
+                   "logo": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=="}
+        r = client.put(f"{API}/settings", json=payload)
+        assert r.status_code == 200, r.text
+        got = client.get(f"{API}/settings").json()
+        assert got["staff"] == ["యజమాని", "రవి", "శ్రీను"]
+        assert got["logo"].startswith("data:image/png;base64,")
+
+    def test_bill_persists_billed_by_and_daily_by_staff(self, client):
+        # ensure staff configured
+        current = client.get(f"{API}/settings").json()
+        client.put(f"{API}/settings", json={**current, "staff": ["యజమాని", "రవి", "శ్రీను"]})
+
+        items = client.get(f"{API}/items").json()
+        it = next(i for i in items if i["code"] == "a2")
+        lines = [{"item_id": it["id"], "code": "a2", "name_te": it["name_te"],
+                  "unit": it["unit"], "qty": 1, "price": it["price"],
+                  "total": round(1 * it["price"], 2)}]
+        r = client.post(f"{API}/bills",
+                        json={"lines": lines, "discount": 0, "payment_mode": "cash",
+                              "billed_by": "రవి"})
+        assert r.status_code == 200, r.text
+        bill = r.json()
+        assert bill["billed_by"] == "రవి"
+
+        # GET single bill returns billed_by
+        g = client.get(f"{API}/bills/{bill['id']}").json()
+        assert g["billed_by"] == "రవి"
+
+        # List bills contain billed_by
+        listed = client.get(f"{API}/bills").json()
+        assert any(b["id"] == bill["id"] and b["billed_by"] == "రవి" for b in listed)
+
+        # Daily report has by_staff aggregation
+        d = client.get(f"{API}/report/daily").json()
+        assert "by_staff" in d and isinstance(d["by_staff"], list)
+        ravi = next((s for s in d["by_staff"] if s["name"] == "రవి"), None)
+        assert ravi is not None
+        assert ravi["bills"] >= 1
+        assert ravi["amount"] >= it["price"]
+
+    def test_bill_without_billed_by_groups_as_dash(self, client):
+        lines = [{"code": "c2", "name_te": "ఉప్పు", "qty": 1, "price": 22, "total": 22}]
+        r = client.post(f"{API}/bills",
+                        json={"lines": lines, "discount": 0, "payment_mode": "cash"})
+        assert r.status_code == 200
+        d = client.get(f"{API}/report/daily").json()
+        dash = next((s for s in d["by_staff"] if s["name"] == "—"), None)
+        assert dash is not None
+        assert dash["bills"] >= 1
+
+
 # ---------- Daily report ----------
 class TestDailyReport:
     def test_daily_report_shape(self, client):

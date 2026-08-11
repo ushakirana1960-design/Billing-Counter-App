@@ -17,6 +17,8 @@ export default function Billing() {
   const [lastBill, setLastBill] = useState(null);
   const [cat, setCat] = useState("అన్నీ");
   const [codeEdit, setCodeEdit] = useState(false);
+  const [staff, setStaff] = useState(["యజమాని"]);
+  const [billedBy, setBilledBy] = useState(localStorage.getItem("uk_billed_by") || "");
   const searchRef = useRef(null);
 
   const saveCode = async (it, code) => {
@@ -46,6 +48,11 @@ export default function Billing() {
     await api.seed().catch(() => {});
     setItems(await api.items());
     setCustomers(await api.customers());
+    const s = await api.settings().catch(() => null);
+    if (s?.staff?.length) {
+      setStaff(s.staff);
+      setBilledBy((b) => b || localStorage.getItem("uk_billed_by") || s.staff[0]);
+    }
   };
   useEffect(() => {
     load();
@@ -140,6 +147,7 @@ export default function Billing() {
         discount: Number(discount) || 0,
         payment_mode: mode,
         customer_id: customerId || null,
+        billed_by: billedBy,
       });
       setLastBill(bill);
       setLines([]);
@@ -344,6 +352,24 @@ export default function Billing() {
 
         <div className="lg:col-span-5 xl:col-span-4">
           <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 lg:sticky lg:top-20">
+            <div>
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">బిల్లు వేసేవారు</label>
+              <select
+                data-testid="billed-by-select"
+                value={billedBy}
+                onChange={(e) => {
+                  setBilledBy(e.target.value);
+                  localStorage.setItem("uk_billed_by", e.target.value);
+                }}
+                className="w-full px-3 py-2 border-2 border-slate-300 rounded-md font-semibold"
+              >
+                {staff.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">ఉప మొత్తం</span>
               <span className="num font-semibold" data-testid="subtotal">{rupee(subtotal)}</span>

@@ -88,6 +88,7 @@ export default function BillHistory() {
                     <th className="p-2 text-left">#</th>
                     <th className="p-2 text-left">తేదీ</th>
                     <th className="p-2 text-left">చెల్లింపు</th>
+                    <th className="p-2 text-left">బిల్లు వేసినవారు</th>
                     <th className="p-2 text-right">మొత్తం</th>
                     <th className="w-24"></th>
                   </tr>
@@ -114,6 +115,7 @@ export default function BillHistory() {
                         </span>{" "}
                         {b.customer_name}
                       </td>
+                      <td className="p-2 text-slate-600">{b.billed_by || "—"}</td>
                       <td className="p-2 text-right num font-bold">{rupee(b.total)}</td>
                       <td className="p-2 text-right">
                         <button
@@ -131,11 +133,10 @@ export default function BillHistory() {
                   ))}
                   {!bills.length && (
                     <tr>
-                      <td colSpan={5} className="p-8 text-center text-slate-400">
+                      <td colSpan={6} className="p-8 text-center text-slate-400">
                         బిల్లులు కనబడలేదు
                       </td>
-                    </tr>
-                  )}
+                    </tr>                  )}
                 </tbody>
               </table>
             </div>

@@ -5,6 +5,7 @@ import jwt
 from datetime import timedelta
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import UpdateOne
 import os
 import logging
 from pathlib import Path
@@ -175,6 +176,7 @@ class BillIn(BaseModel):
     payment_mode: Literal["cash", "upi", "card", "khata"]
     customer_id: Optional[str] = None
     note: str = ""
+    billed_by: str = ""
 
 
 class Bill(BaseModel):
@@ -189,6 +191,7 @@ class Bill(BaseModel):
     customer_id: Optional[str] = None
     customer_name: str = ""
     note: str = ""
+    billed_by: str = ""
     created_at: str = Field(default_factory=now_iso)
 
 
@@ -267,32 +270,37 @@ async def delete_item(item_id: str):
 @api_router.post("/items/bulk-price")
 async def bulk_price(payload: BulkPriceIn):
     updated, created, unchanged = [], [], []
+    codes = [r.code.strip().lower() for r in payload.rows if r.code.strip()]
+    existing = {d["code"]: d for d in await db.items.find({"code": {"$in": codes}}, NO_ID).to_list(5000)}
+    ops, new_docs = [], []
     for row in payload.rows:
         code = row.code.strip().lower()
         if not code:
             continue
-        doc = await db.items.find_one({"code": code}, NO_ID)
+        doc = existing.get(code)
         if doc:
             if abs(float(doc.get("price", 0)) - row.price) < 0.001:
                 unchanged.append({"code": code, "name_te": doc["name_te"], "price": row.price})
                 continue
-            entry = {"code": code, "name_te": doc["name_te"], "old_price": doc.get("price", 0), "price": row.price}
-            updated.append(entry)
-            if not payload.dry_run:
-                upd = {"price": row.price, "updated_at": now_iso()}
-                if row.unit:
-                    upd["unit"] = row.unit
-                if row.name_te:
-                    upd["name_te"] = row.name_te
-                await db.items.update_one({"code": code}, {"$set": upd})
+            updated.append({"code": code, "name_te": doc["name_te"],
+                            "old_price": doc.get("price", 0), "price": row.price})
+            upd = {"price": row.price, "updated_at": now_iso()}
+            if row.unit:
+                upd["unit"] = row.unit
+            if row.name_te:
+                upd["name_te"] = row.name_te
+            ops.append(UpdateOne({"code": code}, {"$set": upd}))
         else:
             if not payload.create_missing:
                 continue
             name = row.name_te or code
             created.append({"code": code, "name_te": name, "price": row.price})
-            if not payload.dry_run:
-                item = Item(code=code, name_te=name, price=row.price, unit=row.unit or "కేజీ")
-                await db.items.insert_one(item.model_dump())
+            new_docs.append(Item(code=code, name_te=name, price=row.price, unit=row.unit or "కేజీ").model_dump())
+    if not payload.dry_run:
+        if ops:
+            await db.items.bulk_write(ops)
+        if new_docs:
+            await db.items.insert_many(new_docs)
     return {"dry_run": payload.dry_run, "updated": updated, "created": created,
             "unchanged": unchanged,
             "summary": {"updated": len(updated), "created": len(created), "unchanged": len(unchanged)}}
@@ -378,11 +386,11 @@ async def create_bill(payload: BillIn):
         cust_name = c["name_te"] if c else ""
     bill = Bill(bill_no=bill_no, lines=payload.lines, subtotal=subtotal, discount=payload.discount,
                 total=total, payment_mode=payload.payment_mode, customer_id=payload.customer_id,
-                customer_name=cust_name, note=payload.note)
+                customer_name=cust_name, note=payload.note, billed_by=payload.billed_by.strip())
     await db.bills.insert_one(bill.model_dump())
-    for l in payload.lines:
-        if l.item_id:
-            await db.items.update_one({"id": l.item_id}, {"$inc": {"stock": -l.qty}})
+    stock_ops = [UpdateOne({"id": l.item_id}, {"$inc": {"stock": -l.qty}}) for l in payload.lines if l.item_id]
+    if stock_ops:
+        await db.items.bulk_write(stock_ops)
     if payload.payment_mode == "khata":
         await db.khata.insert_one({"id": str(uuid.uuid4()), "customer_id": payload.customer_id,
                                    "type": "bill", "amount": total, "bill_id": bill.id,
@@ -433,7 +441,12 @@ async def daily_report(day: Optional[str] = None):
     modes = {"cash": 0.0, "upi": 0.0, "card": 0.0, "khata": 0.0}
     counts = {"cash": 0, "upi": 0, "card": 0, "khata": 0}
     item_map = {}
+    by_staff = {}
     for b in bills:
+        who = b.get("billed_by") or "—"
+        s = by_staff.setdefault(who, {"name": who, "bills": 0, "amount": 0})
+        s["bills"] += 1
+        s["amount"] = round(s["amount"] + b["total"], 2)
         modes[b["payment_mode"]] = round(modes[b["payment_mode"]] + b["total"], 2)
         counts[b["payment_mode"]] += 1
         for l in b["lines"]:
@@ -459,6 +472,7 @@ async def daily_report(day: Optional[str] = None):
         "khata_collected": khata_collected,
         "cash_in_hand": round(modes["cash"] + khata_collected["cash"], 2),
         "top_items": sorted(item_map.values(), key=lambda x: -x["amount"])[:15],
+        "by_staff": sorted(by_staff.values(), key=lambda x: -x["amount"]),
         "bills": bills,
     }
 
@@ -589,6 +603,8 @@ class Shop(BaseModel):
     phone: str = ""
     address: str = ""
     footer: str = "ధన్యవాదాలు! మళ్ళీ రండి"
+    staff: List[str] = ["యజమాని"]
+    logo: str = ""
     ui_scale: int = 100
     receipt_font: int = 11
 
@@ -629,13 +645,23 @@ async def startup():
     elif not verify_password(password, existing["password_hash"]):
         await db.users.update_one({"email": email}, {"$set": {"password_hash": hash_password(password)}})
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+_cors = os.environ.get('CORS_ORIGINS', '*').split(',')
+if '*' in _cors:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_credentials=True,
+        allow_origin_regex=".*",
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_credentials=True,
+        allow_origins=_cors,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

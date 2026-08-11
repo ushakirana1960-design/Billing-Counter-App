@@ -15,6 +15,11 @@ export const Receipt = ({ bill }) => {
 
   return (
     <div style={{ fontFamily: "'Noto Sans Telugu', sans-serif", fontSize: f }}>
+      {shop.logo && (
+        <div style={{ textAlign: "center" }}>
+          <img src={shop.logo} alt="" style={{ maxWidth: "45mm", maxHeight: "20mm", filter: "grayscale(1)" }} />
+        </div>
+      )}
       <div style={{ textAlign: "center", fontWeight: 700, fontSize: f + 4 }}>{shop.name}</div>
       {shop.address && <div style={{ textAlign: "center", fontSize: sm }}>{shop.address}</div>}
       {shop.phone && <div style={{ textAlign: "center", fontSize: sm }}>ఫోన్: {shop.phone}</div>}
@@ -24,6 +29,7 @@ export const Receipt = ({ bill }) => {
         <span>{new Date(bill.created_at).toLocaleString("en-IN")}</span>
       </div>
       {bill.customer_name && <div style={{ fontSize: sm }}>కస్టమర్: {bill.customer_name}</div>}
+      {bill.billed_by && <div style={{ fontSize: sm }}>బిల్లు వేసినవారు: {bill.billed_by}</div>}
       <div style={dash} />
       <table style={{ width: "100%", fontSize: sm }}>
         <thead>
@@ -64,7 +70,13 @@ export const Receipt = ({ bill }) => {
       <div style={dash} />
       <div style={{ textAlign: "center", fontWeight: 700 }}>ఇది అంచనా బిల్లు మాత్రమే</div>
       <div style={{ textAlign: "center", fontSize: sm - 1 }}>THIS IS AN ESTIMATE BILL</div>
-      <div style={{ textAlign: "center", fontSize: sm }}>{shop.footer || "ధన్యవాదాలు! మళ్ళీ రండి"}</div>
+      <div style={{ marginTop: 14, fontSize: sm, display: "flex", justifyContent: "space-between" }}>
+        <span>పరిశీలించినవారు: ____________</span>
+      </div>
+      <div style={{ marginTop: 10, fontSize: sm }}>కస్టమర్ సంతకం: ____________</div>
+      <div style={{ textAlign: "center", fontSize: sm, marginTop: 6 }}>
+        {shop.footer || "ధన్యవాదాలు! మళ్ళీ రండి"}
+      </div>
     </div>
   );
 };

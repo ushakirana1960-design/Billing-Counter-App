@@ -1,0 +1,33 @@
+{
+  "summary": "Iteration 6 (final pre-launch gate) — Backend 24/25 pytest, all NEW features verified (staff array + logo persistence in settings, billed_by on Bill, by_staff aggregation in daily report, '—' grouping for empty billed_by, GET /bills/{id} returns billed_by). Frontend end-to-end verified on desktop + mobile: staff chips (yajamani/రవి/శ్రీను), transliterated staff-name-input, duplicate-name rejected, 8th-name rejected with 'గరిష్టం 7 మందే', staff-remove works, save persists across reload, logo upload → preview → save → header logo visible → logo-remove clears (verified after reload). Billing shows billed-by-select with all 3 staff, remembers selection in localStorage (uk_billed_by=రవి), saved bill sends billed_by and Receipt in #print-area shows logo + 'బిల్లు వేసినవారు: రవి' + 'పరిశీలించినవారు' + 'కస్టమర్ సంతకం' + 'ఇది అంచనా బిల్లు మాత్రమే'. window.print triggered on save (overridden). Shortcut b2*3 Enter, b1 Enter, discount ₹5 → grand-total ₹565.00 (all correct). Daily report /report shows report-staff-table with per-staff bill counts and amounts including 'రవి'. History table has 'బిల్లు వేసినవారు' column with correct names or '—'. Mobile 390x844 sweep on all 9 routes (/, /items, /import, /khata, /history, /report, /week, /month, /settings) — no horizontal overflow, no webpack overlay, no pageerror. Launch-ready.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/report/weekly", "issue": "TestWeeklyReport.test_weekly_report_totals_match_bills flakes under pytest-xdist parallel workers because another worker inserts bills during the diff window; not a real bug — passes when run without -n auto or serially. Recommend guarding via a per-test unique billed_by tag and asserting on that subset, or running weekly test with @pytest.mark.serial."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Billing.jsx initial staff state is ['యజమాని'] until load() completes — UI shows only owner briefly on very slow networks. Consider showing a small spinner on billed-by-select while loading, or reading cached uk_billed_by list. Non-blocking.",
+    "BillHistory.jsx colSpan for the empty-state row is 5 but table now has 6 columns after adding 'బిల్లు వేసినవారు' column — cosmetic only; fix to colSpan=6.",
+    "Receipt.jsx defaults shop state without 'staff' field which is fine, but if a receipt is printed before api.settings() resolves (network flake), the logo will not appear on the very first print. Consider caching the last settings in localStorage similar to uk_billed_by."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (added TestStaffLogoBilledBy class with 3 new tests covering staff/logo persistence, billed_by round-trip, and dash-grouping for empty billed_by)"
+  ],
+  "success_rate": {"backend": "96% (24/25 — 1 flaky parallel-worker race, not a bug)", "frontend": "100%"},
+  "test_credentials": "admin@ushakirana.in / usha@123 (worked)",
+  "seed_data_creation": "Created a few TEST bills during pytest (cash + khata) and 2 UI-driven cash bills (billed_by=యజమాని ₹565, billed_by=రవి ₹540). Staff list saved as ['యజమాని','రవి','శ్రీను']. Logo cleared at end of tests.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "New iteration-6 backend tests live in /app/backend/tests/backend_test.py::TestStaffLogoBilledBy. If pytest-xdist parallel run is used, the weekly totals test may flake — run with `-p no:xdist` for a clean 25/25 pass. All 3 new UI testids verified: staff-chip-<i>, staff-name-input (transliterating), staff-add-btn, staff-remove-<i>, save-settings-btn, logo-file-input, logo-preview, logo-remove-btn, billed-by-select, report-staff-table, and BillHistory table already showed 'బిల్లు వేసినవారు' column with billed_by or '—'."
+}

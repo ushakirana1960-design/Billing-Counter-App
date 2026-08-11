@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { Toaster } from "sonner";
+import { api } from "@/lib/api";
 import {
   ShoppingBasket,
   Tags,
@@ -38,14 +40,24 @@ const NAV = [
 
 function Shell({ children }) {
   const { user, logout } = useAuth();
+  const [shop, setShop] = useState(null);
+
+  useEffect(() => {
+    api.settings().then(setShop).catch(() => {});
+  }, []);
+
   return (
     <div className="min-h-screen">
       <header className="no-print sticky top-0 z-30 bg-white border-b border-slate-200">
         <div className="px-4 py-2.5 flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-2">
-            <div className="h-9 w-9 rounded-md bg-blue-600 grid place-items-center text-white font-bold">ఉ</div>
+            {shop?.logo ? (
+              <img src={shop.logo} alt="" className="h-9 w-9 rounded-md object-contain bg-white border border-slate-200" />
+            ) : (
+              <div className="h-9 w-9 rounded-md bg-blue-600 grid place-items-center text-white font-bold">ఉ</div>
+            )}
             <div>
-              <div className="text-base font-bold leading-tight text-slate-900">ఉష కిరాణా</div>
+              <div className="text-base font-bold leading-tight text-slate-900">{shop?.name || "ఉష కిరాణా"}</div>
               <div className="text-[10px] uppercase tracking-[0.15em] text-slate-500">TELUGU POS · KIRANA</div>
             </div>
           </div>

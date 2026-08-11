@@ -93,6 +93,33 @@ export default function Report() {
         </div>
 
         <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+          <div className="p-3 border-b font-bold">ఎవరు ఎంత బిల్లు వేశారు</div>
+          <table className="w-full border-collapse text-sm" data-testid="report-staff-table">
+            <thead className="bg-slate-100 text-[11px] uppercase text-slate-500">
+              <tr>
+                <th className="p-2 text-left">పేరు</th>
+                <th className="p-2 text-right">బిల్లులు</th>
+                <th className="p-2 text-right">మొత్తం</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(r.by_staff || []).map((s) => (
+                <tr key={s.name} className="border-b border-slate-100">
+                  <td className="p-2 font-semibold">{s.name}</td>
+                  <td className="p-2 text-right num">{s.bills}</td>
+                  <td className="p-2 text-right num font-bold">{rupee(s.amount)}</td>
+                </tr>
+              ))}
+              {!(r.by_staff || []).length && (
+                <tr>
+                  <td colSpan={3} className="p-6 text-center text-slate-400">అమ్మకాలు లేవు</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
           <div className="p-3 border-b font-bold">ఈ రోజు బిల్లులు</div>
           <table className="w-full border-collapse text-sm" data-testid="report-bills-table">
             <thead className="bg-slate-100 text-[11px] uppercase text-slate-500">

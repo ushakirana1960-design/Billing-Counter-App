@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Save, Store, Printer } from "lucide-react";
+import { Save, Store, Printer, Plus, X, ImagePlus } from "lucide-react";
 import { api } from "@/lib/api";
 import TeluguInput from "@/components/TeluguInput";
 
 export default function Settings() {
   const [shop, setShop] = useState(null);
+  const [newStaff, setNewStaff] = useState("");
 
   useEffect(() => {
     api.settings().then(setShop);
@@ -77,6 +78,122 @@ export default function Settings() {
         </div>
       </div>
 
+      <div className="border border-slate-200 rounded-md p-3 space-y-2">
+        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+          దుకాణం గుర్తు / లోగో (బిల్లు పైన ప్రింట్ అవుతుంది)
+        </label>
+        <div className="flex items-center gap-3">
+          {shop.logo ? (
+            <img
+              data-testid="logo-preview"
+              src={shop.logo}
+              alt="logo"
+              className="h-16 w-16 object-contain border border-slate-200 rounded-md bg-white"
+            />
+          ) : (
+            <div className="h-16 w-16 grid place-items-center border border-dashed border-slate-300 rounded-md text-slate-400 text-xs">
+              లోగో లేదు
+            </div>
+          )}
+          <label className="flex items-center gap-2 border-2 border-dashed border-slate-300 rounded-md px-3 py-2 cursor-pointer hover:border-blue-500 transition-colors">
+            <ImagePlus className="h-4 w-4 text-blue-600" />
+            <span className="text-sm font-semibold">బొమ్మ ఎంచుకోండి</span>
+            <input
+              data-testid="logo-file-input"
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const img = new Image();
+                const reader = new FileReader();
+                reader.onload = () => {
+                  img.onload = () => {
+                    const max = 320;
+                    const scale = Math.min(1, max / Math.max(img.width, img.height));
+                    const c = document.createElement("canvas");
+                    c.width = Math.round(img.width * scale);
+                    c.height = Math.round(img.height * scale);
+                    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+                    set("logo")(c.toDataURL("image/png"));
+                    toast.success("లోగో ఎంచుకున్నారు — సేవ్ చెయ్యండి");
+                  };
+                  img.src = String(reader.result);
+                };
+                reader.readAsDataURL(file);
+              }}
+            />
+          </label>
+          {shop.logo && (
+            <button
+              data-testid="logo-remove-btn"
+              onClick={() => set("logo")("")}
+              className="text-rose-600 text-sm font-semibold hover:underline"
+            >
+              తీసేయ్
+            </button>
+          )}
+        </div>
+        <p className="text-xs text-slate-500">
+          PNG / JPG బొమ్మ ఇవ్వండి (చిన్నదిగా మార్చి నిల్వ చేస్తాము). థర్మల్ ప్రింటర్ నలుపు-తెలుపులో ప్రింట్ చేస్తుంది —
+          సన్నని గీతలు లేని, స్పష్టమైన లోగో బాగా వస్తుంది.
+        </p>
+      </div>
+
+      <div className="border border-slate-200 rounded-md p-3 space-y-2">
+        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+          బిల్లు వేసేవారి పేర్లు (గరిష్టం 7)
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {(shop.staff || []).map((s, i) => (
+            <span
+              key={i}
+              data-testid={`staff-chip-${i}`}
+              className="flex items-center gap-1 bg-slate-100 border border-slate-200 rounded-full pl-3 pr-1 py-1 text-sm font-semibold"
+            >
+              {s}
+              <button
+                data-testid={`staff-remove-${i}`}
+                onClick={() => set("staff")((shop.staff || []).filter((_, j) => j !== i))}
+                className="text-rose-600 hover:bg-rose-100 rounded-full p-0.5"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </span>
+          ))}
+          {!(shop.staff || []).length && <span className="text-sm text-slate-400">ఇంకా ఎవరూ లేరు</span>}
+        </div>
+        <div className="flex items-start gap-2">
+          <div className="flex-1">
+            <TeluguInput
+              testId="staff-name-input"
+              value={newStaff}
+              onChange={setNewStaff}
+              placeholder="ravi, srinu akka…"
+            />
+          </div>
+          <button
+            data-testid="staff-add-btn"
+            onClick={() => {
+              const list = shop.staff || [];
+              if (!newStaff.trim()) return toast.error("పేరు రాయండి");
+              if (list.length >= 7) return toast.error("గరిష్టం 7 మందే");
+              if (list.includes(newStaff.trim())) return toast.error("ఈ పేరు ఇప్పటికే ఉంది");
+              set("staff")([...list, newStaff.trim()]);
+              setNewStaff("");
+            }}
+            className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-semibold active:scale-95 transition-colors"
+          >
+            <Plus className="h-4 w-4" /> చేర్చు
+          </button>
+        </div>
+        <p className="text-xs text-slate-500">
+          బిల్లింగ్ స్క్రీన్‌లో ఎవరు బిల్లు వేస్తున్నారో ఎంచుకుంటారు; ఆ పేరు బిల్లుపై “బిల్లు వేసినవారు” గా ప్రింట్
+          అవుతుంది. బిల్లు కింద <span className="font-semibold">పరిశీలించినవారు</span> కోసం సంతకం స్థలం కూడా వస్తుంది.
+        </p>
+      </div>
+
       <div className="border border-dashed border-slate-300 rounded-md p-3 space-y-3">
         <div>
           <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -142,6 +259,7 @@ export default function Settings() {
 
       <div className="border border-dashed border-slate-300 rounded-md p-3 text-center">
         <div className="text-[10px] uppercase tracking-wider text-slate-400 mb-1">బిల్లు పైభాగం ప్రివ్యూ</div>
+        {shop.logo && <img src={shop.logo} alt="" className="h-10 mx-auto mb-1 object-contain" />}
         <div className="font-bold" data-testid="shop-preview-name">{shop.name}</div>
         {shop.address && <div className="text-xs">{shop.address}</div>}
         {shop.phone && <div className="text-xs num">ఫోన్: {shop.phone}</div>}
