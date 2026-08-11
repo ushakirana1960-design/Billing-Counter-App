@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
 import { Toaster } from "sonner";
-import { ShoppingBasket, Tags, Upload, NotebookPen, BarChart3, ReceiptText } from "lucide-react";
+import { ShoppingBasket, Tags, Upload, NotebookPen, BarChart3, ReceiptText, Store } from "lucide-react";
+import Settings from "@/pages/Settings";
 import BillHistory from "@/pages/BillHistory";
 import Billing from "@/pages/Billing";
 import Items from "@/pages/Items";
@@ -15,6 +16,7 @@ const NAV = [
   { to: "/khata", label: "ఖాతా", icon: NotebookPen, id: "nav-khata" },
   { to: "/history", label: "పాత బిల్లులు", icon: ReceiptText, id: "nav-history" },
   { to: "/report", label: "రోజు నివేదిక", icon: BarChart3, id: "nav-report" },
+  { to: "/settings", label: "దుకాణం వివరాలు", icon: Store, id: "nav-settings" },
 ];
 
 function Shell({ children }) {
@@ -23,9 +25,9 @@ function Shell({ children }) {
       <header className="no-print sticky top-0 z-30 bg-white border-b border-slate-200">
         <div className="px-4 py-2.5 flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-2">
-            <div className="h-9 w-9 rounded-md bg-blue-600 grid place-items-center text-white font-bold">కి</div>
+            <div className="h-9 w-9 rounded-md bg-blue-600 grid place-items-center text-white font-bold">ఉ</div>
             <div>
-              <div className="text-base font-bold leading-tight text-slate-900">శ్రీ కిరాణా బిల్లింగ్</div>
+              <div className="text-base font-bold leading-tight text-slate-900">ఉష కిరాణా</div>
               <div className="text-[10px] uppercase tracking-[0.15em] text-slate-500">TELUGU POS · KIRANA</div>
             </div>
           </div>
@@ -65,6 +67,7 @@ export default function App() {
           <Route path="/khata" element={<Khata />} />
           <Route path="/history" element={<BillHistory />} />
           <Route path="/report" element={<Report />} />
+          <Route path="/settings" element={<Settings />} />
         </Routes>
       </Shell>
     </BrowserRouter>

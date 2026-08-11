@@ -16,6 +16,8 @@ export const api = {
   bills: (params) => axios.get(`${API}/bills`, { params }).then((r) => r.data),
   report: (day) => axios.get(`${API}/report/daily`, { params: { day } }).then((r) => r.data),
   seed: () => axios.post(`${API}/seed`).then((r) => r.data),
+  settings: () => axios.get(`${API}/settings`).then((r) => r.data),
+  saveSettings: (d) => axios.put(`${API}/settings`, d).then((r) => r.data),
 };
 
 export const rupee = (n) =>

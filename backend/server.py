@@ -365,6 +365,27 @@ async def seed():
     return {"created_items": created}
 
 
+class Shop(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    name: str = "ఉష కిరాణా"
+    phone: str = ""
+    address: str = ""
+    gstin: str = ""
+    footer: str = "ధన్యవాదాలు! మళ్ళీ రండి"
+
+
+@api_router.get("/settings", response_model=Shop)
+async def get_settings():
+    doc = await db.settings.find_one({"key": "shop"}, NO_ID)
+    return Shop(**(doc or {}))
+
+
+@api_router.put("/settings", response_model=Shop)
+async def put_settings(payload: Shop):
+    await db.settings.update_one({"key": "shop"}, {"$set": {**payload.model_dump(), "key": "shop"}}, upsert=True)
+    return payload
+
+
 @api_router.get("/")
 async def root():
     return {"message": "కిరాణా బిల్లింగ్ API"}
