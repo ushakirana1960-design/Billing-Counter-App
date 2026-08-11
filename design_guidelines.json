@@ -1,0 +1,101 @@
+{
+  "project_context": "Hybrid Fullstack POS (Point of Sale) Billing System for Grocery Shop with Telugu UI.",
+  "theme": "light",
+  "typography": {
+    "primary_font": "Noto Sans Telugu",
+    "display_font": "IBM Plex Sans",
+    "font_setup": "Import via Google Fonts: <link href='https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=Noto+Sans+Telugu:wght@400;500;600;700&display=swap' rel='stylesheet'>",
+    "hierarchy": {
+      "h1": "text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 (Use Noto Sans Telugu)",
+      "h2": "text-xl sm:text-2xl font-semibold text-slate-800",
+      "h3": "text-lg sm:text-xl font-semibold text-slate-800",
+      "body": "text-base text-slate-700 font-medium",
+      "numbers": "font-mono or IBM Plex Sans for prices, quantities, and shortcut codes (a1, b2).",
+      "labels": "text-xs font-bold uppercase tracking-[0.1em] text-slate-500"
+    }
+  },
+  "colors": {
+    "archetype": "The Performance Pro / High-Density Technical",
+    "background": {
+      "app": "bg-slate-50",
+      "surface": "bg-white",
+      "surface_alt": "bg-slate-100"
+    },
+    "text": {
+      "primary": "text-slate-900",
+      "secondary": "text-slate-500",
+      "inverse": "text-white"
+    },
+    "brand": {
+      "primary": "bg-blue-600 text-white hover:bg-blue-700",
+      "success": "bg-emerald-600 text-white hover:bg-emerald-700",
+      "warning": "bg-amber-500 text-white hover:bg-amber-600",
+      "danger": "bg-rose-600 text-white hover:bg-rose-700"
+    },
+    "borders": {
+      "default": "border-slate-200",
+      "focus": "border-blue-500 ring-2 ring-blue-500/20"
+    }
+  },
+  "visual_enhancers": {
+    "borders_and_radii": "Use subtle roundness (rounded-md to rounded-lg max). Sharp edges for nested tables/grids.",
+    "shadows": "Minimal. shadow-sm on cards, shadow-md on dropdowns/modals. Avoid heavy shadows to maintain a flat, fast POS look.",
+    "surfaces": "Grid Borders (The 'Technical' Look). Use border-collapse for high-density item tables."
+  },
+  "grids_and_layouts": {
+    "strategy": "High Density Grid (Mode B) - POS Layout",
+    "main_layout": "grid-cols-1 lg:grid-cols-12 gap-4 h-screen p-4 overflow-hidden",
+    "left_panel": "lg:col-span-8 flex flex-col gap-4 h-full (Search, Shortcut Input, Quick Items Grid)",
+    "right_panel": "lg:col-span-4 flex flex-col bg-white border border-slate-200 rounded-lg shadow-sm h-full (Running Bill, Khata, Checkout)",
+    "spacing": "Tight spacing (p-2, p-3, p-4) to maximize vertical space for items. Use flex-1 overflow-y-auto for lists."
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-blue-600 text-white rounded-md px-4 py-2 font-semibold transition-colors active:scale-95",
+      "checkout": "w-full bg-emerald-600 text-white py-4 rounded-md text-xl font-bold shadow-sm"
+    },
+    "inputs": {
+      "search": "w-full text-lg p-3 border-2 border-slate-300 rounded-md focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all font-mono for shortcuts"
+    },
+    "tables": {
+      "billing": "w-full text-left border-collapse. th: text-xs uppercase bg-slate-100 p-2 border-b. td: p-2 border-b text-sm font-medium."
+    },
+    "cards": {
+      "khata": "border border-amber-200 bg-amber-50 p-4 rounded-lg flex justify-between items-center"
+    }
+  },
+  "motion": {
+    "strategy": "Minimal/Instantaneous",
+    "details": "POS systems require speed. Avoid long animations. Use scale-95 on button clicks, and fast hover transitions (duration-150)."
+  },
+  "accessibility_and_interactions": {
+    "keyboard_first": "CRITICAL. Must be fully operable via keyboard. Enter to add item, Up/Down to navigate lists, specific hotkeys (e.g., F2 for Pay, F3 for Khata) if feasible.",
+    "shortcuts": "Main input should parse shortcodes (e.g., 'a1', 'b2') and instantly map them to grocery items like 'Butter' (వెన్న) in the backend/state.",
+    "test_ids": "Include standard data-testid attributes (e.g., data-testid='pos-search-input', data-testid='checkout-btn')."
+  },
+  "media_and_icons": {
+    "library": "lucide-react",
+    "usage": "Use icons for clear actions (Trash2 for delete item, Printer for print receipt, FileSpreadsheet for CSV upload)."
+  },
+  "technical_implementation": {
+    "transliteration": {
+      "library": "yarn add react-transliterate",
+      "instruction": "Wrap main input fields with <ReactTransliterate> configured for language='te' (Telugu). This allows users to type 'venna' and output 'వెన్న'."
+    },
+    "csv_import": {
+      "instruction": "Use standard HTML <input type='file' accept='.csv' /> and parse using a library like Papaparse (yarn add papaparse). Show a diff/preview table before confirming."
+    },
+    "print_css": {
+      "instruction": "Create a thermal receipt layout hidden by default, visible only in @media print. Apply .print:hidden to the main POS UI and .print:block to the receipt div. Width should be constrained for 80mm thermal printers (max-w-[300px])."
+    }
+  },
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "No generic centered layouts. This is a high-density POS system, left-align lists and right-align prices/numbers.",
+    "Do not apply global 'transition: all' as it breaks performance. Use specific transitions.",
+    "Use solid colors, no generic gradients. The interface must be high-contrast and readable under bright shop lights.",
+    "Ensure 'react-transliterate' is installed and used for all manual text entries to support seamless English-to-Telugu typing.",
+    "Use 'sonner' for toast notifications (e.g., 'Prices Updated Successfully', 'Bill Settled').",
+    "For Khata (credit ledgers), use warning colors (Amber) to denote unpaid balances.",
+    "Every interactive element MUST include a data-testid attribute in kebab-case."
+  ]
+}
