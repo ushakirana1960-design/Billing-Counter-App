@@ -3,14 +3,22 @@ import os
 import pytest
 import requests
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://bulk-price-hub.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ['REACT_APP_BACKEND_URL'].rstrip('/')
 API = f"{BASE_URL}/api"
+ADMIN_EMAIL = "admin@ushakirana.in"
+ADMIN_PASSWORD = "usha@123"
 
 
 @pytest.fixture(scope="session")
 def client():
     s = requests.Session()
     s.headers.update({"Content-Type": "application/json"})
+    # Login first to get access token
+    r = s.post(f"{BASE_URL}/api/auth/login",
+               json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD})
+    assert r.status_code == 200, f"admin login failed: {r.status_code} {r.text}"
+    token = r.json()["access_token"]
+    s.headers.update({"Authorization": f"Bearer {token}"})
     return s
 
 
@@ -19,6 +27,61 @@ def seed_db(client):
     r = client.post(f"{API}/seed")
     assert r.status_code == 200, r.text
     return r.json()
+
+
+# ---------- Auth ----------
+class TestAuth:
+    def test_unauth_items_returns_401(self):
+        r = requests.get(f"{API}/items")
+        assert r.status_code == 401, r.text
+
+    def test_login_wrong_password_returns_401_telugu(self):
+        r = requests.post(f"{API}/auth/login",
+                          json={"email": ADMIN_EMAIL, "password": "wrong-pass-xyz"})
+        assert r.status_code in (401, 429), r.text
+        if r.status_code == 401:
+            body = r.json()
+            # FastAPI HTTPException default returns {"detail": "..."}
+            msg = body.get("detail", "")
+            assert "పాస్" in msg or "తప్పు" in msg, f"expected Telugu error, got {msg!r}"
+
+    def test_login_success_and_me(self, client):
+        r = client.get(f"{API}/auth/me")
+        assert r.status_code == 200, r.text
+        me = r.json()
+        assert me["email"] == ADMIN_EMAIL
+        assert me.get("role") == "admin"
+
+    def test_bearer_token_works_for_items(self, client):
+        r = client.get(f"{API}/items")
+        assert r.status_code == 200
+
+
+# ---------- Settings ----------
+class TestSettings:
+    def test_settings_shape_no_gstin_required(self, client):
+        r = client.get(f"{API}/settings")
+        assert r.status_code == 200
+        data = r.json()
+        assert "name" in data and "phone" in data and "address" in data and "footer" in data
+
+    def test_settings_update_persists(self, client):
+        current = client.get(f"{API}/settings").json()
+        new_payload = {
+            "name": "ఉష కిరాణా",
+            "phone": "9999900000",
+            "address": "మెయిన్ రోడ్, హైదరాబాదు",
+            "footer": "ధన్యవాదాలు!",
+            "gstin": "",
+        }
+        r = client.put(f"{API}/settings", json=new_payload)
+        assert r.status_code == 200
+        got = client.get(f"{API}/settings").json()
+        assert got["name"] == new_payload["name"]
+        assert got["phone"] == new_payload["phone"]
+        assert got["address"] == new_payload["address"]
+        # restore
+        client.put(f"{API}/settings", json={**current})
 
 
 # ---------- Items / Seed ----------

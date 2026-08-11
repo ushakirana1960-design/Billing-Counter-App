@@ -17,6 +17,8 @@ export default function Settings() {
 
   const save = async () => {
     await api.saveSettings(shop);
+    localStorage.setItem("uk_ui_scale", String(shop.ui_scale));
+    document.documentElement.style.fontSize = `${shop.ui_scale * 0.16}px`;
     toast.success("దుకాణం వివరాలు సేవ్ అయ్యాయి — ఇకపై బిల్లుపై ఇవే వస్తాయి");
   };
 
@@ -62,15 +64,6 @@ export default function Settings() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label className="text-xs font-bold uppercase tracking-wider text-slate-500">GSTIN (ఐచ్ఛికం)</label>
-          <input
-            data-testid="shop-gstin-input"
-            value={shop.gstin}
-            onChange={(e) => set("gstin")(e.target.value)}
-            className="w-full px-3 py-2 border-2 border-slate-300 rounded-md num focus:border-blue-500 focus:outline-none"
-          />
-        </div>
-        <div>
           <label className="text-xs font-bold uppercase tracking-wider text-slate-500">బిల్లు కింద సందేశం</label>
           <input
             data-testid="shop-footer-input"
@@ -78,6 +71,72 @@ export default function Settings() {
             onChange={(e) => set("footer")(e.target.value)}
             className="w-full px-3 py-2 border-2 border-slate-300 rounded-md focus:border-blue-500 focus:outline-none"
           />
+        </div>
+        <div className="text-xs text-slate-500 self-end pb-2">
+          ప్రతి బిల్లు కింద <span className="font-bold">“ఇది అంచనా బిల్లు మాత్రమే”</span> అని ప్రింట్ అవుతుంది.
+        </div>
+      </div>
+
+      <div className="border border-dashed border-slate-300 rounded-md p-3 space-y-3">
+        <div>
+          <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            తెర అక్షరాల పరిమాణం — {shop.ui_scale}%
+          </label>
+          <input
+            data-testid="ui-scale-slider"
+            type="range"
+            min="85"
+            max="140"
+            step="5"
+            value={shop.ui_scale}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              set("ui_scale")(v);
+              document.documentElement.style.fontSize = `${v * 0.16}px`;
+            }}
+            className="w-full accent-blue-600"
+          />
+          <div className="flex gap-2 mt-1">
+            {[
+              ["చిన్నది", 90],
+              ["సాధారణం", 100],
+              ["పెద్దది", 115],
+              ["చాలా పెద్దది", 130],
+            ].map(([l, v]) => (
+              <button
+                key={v}
+                data-testid={`ui-scale-${v}`}
+                onClick={() => {
+                  set("ui_scale")(v);
+                  document.documentElement.style.fontSize = `${v * 0.16}px`;
+                }}
+                className={`px-2.5 py-1 rounded-full text-xs font-bold border transition-colors ${
+                  shop.ui_scale === v ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 text-slate-600"
+                }`}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            బిల్లు ప్రింట్ అక్షరాల పరిమాణం — {shop.receipt_font}px
+          </label>
+          <input
+            data-testid="receipt-font-slider"
+            type="range"
+            min="8"
+            max="16"
+            step="1"
+            value={shop.receipt_font}
+            onChange={(e) => set("receipt_font")(Number(e.target.value))}
+            className="w-full accent-blue-600"
+          />
+          <div style={{ fontSize: Number(shop.receipt_font) }} className="text-center border-t border-dashed pt-1">
+            కందిపప్పు · 2 × 172 · ₹344.00
+          </div>
         </div>
       </div>
 

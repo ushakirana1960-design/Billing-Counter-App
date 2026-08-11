@@ -29,6 +29,14 @@ Kirana shopkeeper at the counter — keyboard-first, fast, Telugu-reading, print
 
 - Bill History (2026-06): date-range + search by bill number / customer / item code-name, bill detail panel, thermal reprint of any old bill. Backend `GET /api/bills?from_day&to_day&q` and `GET /api/bills/{id}`.
 
+## Added later (2026-06)
+- Shop settings (`GET/PUT /api/settings`): name (ఉష కిరాణా), phone, address, footer, ui_scale, receipt_font. Printed on every receipt. NO GST number. Receipt always prints "ఇది అంచనా బిల్లు మాత్రమే / THIS IS AN ESTIMATE BILL".
+- Admin JWT auth: bcrypt + PyJWT, httpOnly cookie + Bearer fallback, brute-force lockout (5 tries/15 min), idempotent admin seed from env. All `/api/*` except `/api/auth/*` require the token. Login page + logout in header.
+- Easy daily rate changes: QuickRate bar on Items page (code → Enter → price → Enter, or one-shot `b2 172`), inline click-to-edit price AND shortcut code per row (duplicate-code protected), paste/CSV bulk import accepting comma / space / tab / `=` separators.
+- Flexibility: editable shortcut codes, screen text size (85–140%, persisted) and receipt print font size (8–16px).
+- POS: category filter chips, `/` hotkey to focus search.
+- Paper bills only — no WhatsApp/SMS sharing (explicit user decision).
+
 ## Backlog
 - P1: WhatsApp/SMS bill share; per-customer khata statement print.
 - P1: Barcode scanner input; stock/inventory tracking with low-stock alerts.

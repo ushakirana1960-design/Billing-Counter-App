@@ -1,13 +1,24 @@
 import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
 import { Toaster } from "sonner";
-import { ShoppingBasket, Tags, Upload, NotebookPen, BarChart3, ReceiptText, Store } from "lucide-react";
-import Settings from "@/pages/Settings";
-import BillHistory from "@/pages/BillHistory";
+import {
+  ShoppingBasket,
+  Tags,
+  Upload,
+  NotebookPen,
+  BarChart3,
+  ReceiptText,
+  Store,
+  LogOut,
+} from "lucide-react";
+import { AuthProvider, useAuth } from "@/lib/auth";
+import Login from "@/pages/Login";
 import Billing from "@/pages/Billing";
 import Items from "@/pages/Items";
 import PriceImport from "@/pages/PriceImport";
 import Khata from "@/pages/Khata";
 import Report from "@/pages/Report";
+import BillHistory from "@/pages/BillHistory";
+import Settings from "@/pages/Settings";
 
 const NAV = [
   { to: "/", label: "బిల్లింగ్", icon: ShoppingBasket, id: "nav-billing" },
@@ -20,6 +31,7 @@ const NAV = [
 ];
 
 function Shell({ children }) {
+  const { user, logout } = useAuth();
   return (
     <div className="min-h-screen">
       <header className="no-print sticky top-0 z-30 bg-white border-b border-slate-200">
@@ -48,6 +60,14 @@ function Shell({ children }) {
               </NavLink>
             ))}
           </nav>
+          <button
+            data-testid="logout-btn"
+            onClick={logout}
+            title={user?.email}
+            className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-semibold text-rose-700 hover:bg-rose-50 transition-colors"
+          >
+            <LogOut className="h-4 w-4" /> లాగ్ అవుట్
+          </button>
         </div>
       </header>
       <main className="p-3 sm:p-4">{children}</main>
@@ -55,21 +75,33 @@ function Shell({ children }) {
   );
 }
 
+function Gate() {
+  const { user } = useAuth();
+  if (user === null)
+    return <div className="min-h-screen grid place-items-center text-slate-400">లోడ్ అవుతోంది…</div>;
+  if (user === false) return <Login />;
+  return (
+    <Shell>
+      <Routes>
+        <Route path="/" element={<Billing />} />
+        <Route path="/items" element={<Items />} />
+        <Route path="/import" element={<PriceImport />} />
+        <Route path="/khata" element={<Khata />} />
+        <Route path="/history" element={<BillHistory />} />
+        <Route path="/report" element={<Report />} />
+        <Route path="/settings" element={<Settings />} />
+      </Routes>
+    </Shell>
+  );
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <Toaster position="top-center" richColors />
-      <Shell>
-        <Routes>
-          <Route path="/" element={<Billing />} />
-          <Route path="/items" element={<Items />} />
-          <Route path="/import" element={<PriceImport />} />
-          <Route path="/khata" element={<Khata />} />
-          <Route path="/history" element={<BillHistory />} />
-          <Route path="/report" element={<Report />} />
-          <Route path="/settings" element={<Settings />} />
-        </Routes>
-      </Shell>
+      <AuthProvider>
+        <Gate />
+      </AuthProvider>
     </BrowserRouter>
   );
 }

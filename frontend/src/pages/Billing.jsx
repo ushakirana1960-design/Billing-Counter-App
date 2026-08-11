@@ -15,7 +15,19 @@ export default function Billing() {
   const [mode, setMode] = useState("cash");
   const [customerId, setCustomerId] = useState("");
   const [lastBill, setLastBill] = useState(null);
+  const [cat, setCat] = useState("అన్నీ");
   const searchRef = useRef(null);
+
+  useEffect(() => {
+    const onSlash = (e) => {
+      if (e.key === "/" && document.activeElement?.tagName !== "INPUT") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onSlash);
+    return () => window.removeEventListener("keydown", onSlash);
+  }, []);
 
   const load = async () => {
     await api.seed().catch(() => {});
@@ -135,6 +147,9 @@ export default function Billing() {
     return g;
   }, [items]);
 
+  const categories = ["అన్నీ", ...Object.keys(grouped)];
+  const visibleCats = cat === "అన్నీ" ? Object.entries(grouped) : [[cat, grouped[cat] || []]];
+
   return (
     <>
       <div className="no-print grid grid-cols-1 lg:grid-cols-12 gap-4">
@@ -243,11 +258,27 @@ export default function Billing() {
           </div>
 
           <div className="bg-white border border-slate-200 rounded-lg p-3">
-            <div className="text-[11px] uppercase tracking-wider text-slate-500 mb-2">త్వరిత వస్తువులు</div>
+            <div className="text-[11px] uppercase tracking-wider text-slate-500 mb-2">
+              త్వరిత వస్తువులు · <span className="num">/</span> నొక్కితే సెర్చ్ బాక్స్‌కు వెళ్తుంది
+            </div>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {categories.map((c) => (
+                <button
+                  key={c}
+                  data-testid={`cat-${c}`}
+                  onClick={() => setCat(c)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${
+                    cat === c ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 text-slate-600 hover:border-slate-400"
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
             <div className="space-y-3 max-h-72 overflow-y-auto">
-              {Object.entries(grouped).map(([cat, list]) => (
-                <div key={cat}>
-                  <div className="text-xs font-bold text-slate-400 mb-1">{cat}</div>
+              {visibleCats.map(([cname, list]) => (
+                <div key={cname}>
+                  <div className="text-xs font-bold text-slate-400 mb-1">{cname}</div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2">
                     {list.map((it) => (
                       <button

@@ -3,11 +3,10 @@ import { toast } from "sonner";
 import { FileSpreadsheet, Eye, CheckCircle2, ArrowRight } from "lucide-react";
 import { api, rupee } from "@/lib/api";
 
-const SAMPLE = `code,name_te,price
-a1,వెన్న,540
-b1,బియ్యం (సోనా మసూరి),64
-b2,కందిపప్పు,172
-c1,పంచదార,48`;
+const SAMPLE = `a1 540
+b1 64
+b2 172
+c1 48`;
 
 function parseCSV(text) {
   const lines = text.trim().split(/\r?\n/).filter(Boolean);
@@ -16,7 +15,7 @@ function parseCSV(text) {
   const hasHeader = header.includes("code") || header.includes("కోడ్");
   const rows = [];
   (hasHeader ? lines.slice(1) : lines).forEach((ln) => {
-    const parts = ln.split(/[,\t;]/).map((s) => s.trim());
+    const parts = ln.split(/[,\t;=|]|\s{1,}/).map((s) => s.trim()).filter(Boolean);
     if (parts.length < 2) return;
     const code = parts[0];
     const priceStr = parts[parts.length - 1];
@@ -75,8 +74,9 @@ export default function PriceImport() {
       <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
         <h2 className="text-xl font-bold">రేట్లు ఒకేసారి అప్‌డేట్</h2>
         <p className="text-sm text-slate-500">
-          ఫార్మాట్: <span className="num font-semibold">code, పేరు (ఐచ్ఛికం), కొత్త రేటు</span>. CSV ఫైల్ అప్‌లోడ్ చేయండి
-          లేదా కింద పేస్ట్ చేయండి.
+          ఒక్కో లైన్‌లో <span className="num font-semibold">కోడ్ కొత్తరేటు</span> చాలు — ఉదా.{" "}
+          <span className="num font-semibold">b2 172</span>. కామా, స్పేస్, టాబ్, <span className="num">=</span> ఏదైనా
+          పనిచేస్తుంది. CSV ఫైల్ అప్‌లోడ్ చేయొచ్చు లేదా కింద పేస్ట్ చేయొచ్చు.
         </p>
         <label className="flex items-center gap-2 border-2 border-dashed border-slate-300 rounded-md p-3 cursor-pointer hover:border-blue-500 transition-colors">
           <FileSpreadsheet className="h-5 w-5 text-blue-600" />

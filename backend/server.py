@@ -1,5 +1,8 @@
-from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response
 from dotenv import load_dotenv
+import bcrypt
+import jwt
+from datetime import timedelta
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
@@ -18,9 +21,93 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 app = FastAPI()
-api_router = APIRouter(prefix="/api")
 
 NO_ID = {"_id": 0}
+JWT_ALG = "HS256"
+LOCK_TRIES = 5
+LOCK_MINUTES = 15
+
+
+def hash_password(p: str) -> str:
+    return bcrypt.hashpw(p.encode(), bcrypt.gensalt()).decode()
+
+
+def verify_password(p: str, h: str) -> bool:
+    try:
+        return bcrypt.checkpw(p.encode(), h.encode())
+    except ValueError:
+        return False
+
+
+def create_access_token(user_id: str, email: str) -> str:
+    return jwt.encode(
+        {"sub": user_id, "email": email, "type": "access",
+         "exp": datetime.now(timezone.utc) + timedelta(hours=12)},
+        os.environ["JWT_SECRET"], algorithm=JWT_ALG)
+
+
+async def get_current_user(request: Request) -> dict:
+    token = request.cookies.get("access_token")
+    if not token:
+        header = request.headers.get("Authorization", "")
+        if header.startswith("Bearer "):
+            token = header[7:]
+    if not token:
+        raise HTTPException(401, "లాగిన్ అవ్వండి")
+    try:
+        payload = jwt.decode(token, os.environ["JWT_SECRET"], algorithms=[JWT_ALG])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(401, "సెషన్ ముగిసింది, మళ్ళీ లాగిన్ అవ్వండి")
+    except jwt.InvalidTokenError:
+        raise HTTPException(401, "చెల్లని టోకెన్")
+    user = await db.users.find_one({"id": payload.get("sub")}, {"_id": 0, "password_hash": 0})
+    if not user:
+        raise HTTPException(401, "వినియోగదారు కనబడలేదు")
+    return user
+
+
+auth_router = APIRouter(prefix="/api/auth")
+api_router = APIRouter(prefix="/api", dependencies=[Depends(get_current_user)])
+
+
+class LoginIn(BaseModel):
+    email: str
+    password: str
+
+
+@auth_router.post("/login")
+async def login(payload: LoginIn, request: Request, response: Response):
+    email = payload.email.strip().lower()
+    ident = f"{request.client.host if request.client else 'x'}:{email}"
+    att = await db.login_attempts.find_one({"identifier": ident}, NO_ID)
+    if att and att.get("count", 0) >= LOCK_TRIES:
+        locked_until = datetime.fromisoformat(att["last"]) + timedelta(minutes=LOCK_MINUTES)
+        if datetime.now(timezone.utc) < locked_until:
+            raise HTTPException(429, "ఎక్కువ సార్లు తప్పు పాస్‌వర్డ్. 15 నిమిషాల తర్వాత ప్రయత్నించండి")
+        await db.login_attempts.delete_one({"identifier": ident})
+    user = await db.users.find_one({"email": email})
+    if not user or not verify_password(payload.password, user["password_hash"]):
+        await db.login_attempts.update_one(
+            {"identifier": ident},
+            {"$inc": {"count": 1}, "$set": {"last": now_iso()}}, upsert=True)
+        raise HTTPException(401, "ఈమెయిల్ లేదా పాస్‌వర్డ్ తప్పు")
+    await db.login_attempts.delete_one({"identifier": ident})
+    token = create_access_token(user["id"], user["email"])
+    response.set_cookie("access_token", token, httponly=True, secure=True,
+                        samesite="none", max_age=43200, path="/")
+    return {"access_token": token, "user": {"id": user["id"], "email": user["email"],
+                                            "name": user.get("name", ""), "role": user.get("role", "admin")}}
+
+
+@auth_router.get("/me")
+async def me(user: dict = Depends(get_current_user)):
+    return user
+
+
+@auth_router.post("/logout")
+async def logout(response: Response):
+    response.delete_cookie("access_token", path="/")
+    return {"ok": True}
 
 
 def now_iso():
@@ -135,7 +222,11 @@ async def update_item(item_id: str, payload: ItemIn):
     doc = await db.items.find_one({"id": item_id}, NO_ID)
     if not doc:
         raise HTTPException(404, "వస్తువు కనబడలేదు")
-    upd = {**payload.model_dump(), "code": payload.code.strip().lower(), "updated_at": now_iso()}
+    code = payload.code.strip().lower()
+    clash = await db.items.find_one({"code": code, "id": {"$ne": item_id}})
+    if clash:
+        raise HTTPException(400, f"'{code}' కోడ్ ఇప్పటికే {clash['name_te']} కి ఉంది")
+    upd = {**payload.model_dump(), "code": code, "updated_at": now_iso()}
     await db.items.update_one({"id": item_id}, {"$set": upd})
     return Item(**{**doc, **upd})
 
@@ -370,8 +461,9 @@ class Shop(BaseModel):
     name: str = "ఉష కిరాణా"
     phone: str = ""
     address: str = ""
-    gstin: str = ""
     footer: str = "ధన్యవాదాలు! మళ్ళీ రండి"
+    ui_scale: int = 100
+    receipt_font: int = 11
 
 
 @api_router.get("/settings", response_model=Shop)
@@ -391,7 +483,24 @@ async def root():
     return {"message": "కిరాణా బిల్లింగ్ API"}
 
 
+app.include_router(auth_router)
 app.include_router(api_router)
+
+
+@app.on_event("startup")
+async def startup():
+    await db.users.create_index("email", unique=True)
+    await db.login_attempts.create_index("identifier")
+    await db.items.create_index("code")
+    email = os.environ["ADMIN_EMAIL"].strip().lower()
+    password = os.environ["ADMIN_PASSWORD"]
+    existing = await db.users.find_one({"email": email})
+    if not existing:
+        await db.users.insert_one({"id": str(uuid.uuid4()), "email": email,
+                                   "password_hash": hash_password(password),
+                                   "name": "యజమాని", "role": "admin", "created_at": now_iso()})
+    elif not verify_password(password, existing["password_hash"]):
+        await db.users.update_one({"email": email}, {"$set": {"password_hash": hash_password(password)}})
 
 app.add_middleware(
     CORSMiddleware,

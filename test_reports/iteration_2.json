@@ -1,0 +1,43 @@
+{
+  "summary": "Iteration 2 e2e testing for Telugu POS 'ఉష కిరాణా' with new JWT auth layer. Backend: 13/13 pytest tests pass (auth 401 for unauth, wrong-pw 401 Telugu msg, /auth/me, bearer works, seed+items, customers, bulk-price dry-run+apply, cash bill, khata bill+settlement, daily report, settings CRUD without GSTIN). Frontend: login gate, wrong-pw error, correct-login → POS shell, logout, POS '/' hotkey, cat filter chips, code shortcut b2 Enter, b1*3 qty, discount, cash bill save + window.print override, receipt contains 'ఉష కిరాణా' + 'ఇది అంచనా బిల్లు మాత్రమే' + no 'GSTIN', khata bill with customer select, bulk import (space/comma/= all parse), khata settlement reduces balance and appears in ledger, history date-range+search+detail+reprint, report cards (cash/UPI/card/khata), settings save with NO GSTIN field, address transliteration works (preview 'మైన్ రోడ్'), and mobile 390x844 for all 7 pages (no horizontal overflow). Found 1 medium UI bug on Items page and 1 potential race on QuickRate one-shot.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Items.jsx – inline item-price input",
+        "issue": "Row price input uses defaultValue={it.price} (uncontrolled). After QuickRate or bulk-import updates the price, the DB is correct but the visible input keeps the stale value until page reload. Confirmed: toast said 'b2: ₹172 → ₹168' & backend returned 168, but item-price-b2 input still displayed 172.",
+        "selector": "[data-testid='item-price-<code>']",
+        "priority": "MEDIUM"
+      },
+      {
+        "component": "Items.jsx – QuickRate one-shot 'code price'",
+        "issue": "One-shot form (e.g. typing 'b2 199' in quick-rate-code and pressing Enter) intermittently shows toast 'కోడ్ కనబడలేదు' even though the code exists. The two-step flow (code Enter → price Enter) always works. Likely stale-closure: onKeyDown reads `code` from state that hasn't flushed yet after the last onChange, so apply() splits an old value. Repro: on freshly loaded /items, type 'b2 199' and press Enter in the code box.",
+        "selector": "[data-testid='quick-rate-code']",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Billing – khata customer <select>", "issues": ["React hydration warning: <span> cannot be a child of <option>. Caused by emergent instrumentation wrapping option text — same as iteration 1; not user-fixable."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Items.jsx: switch item-price-<code> to controlled input (value={row.price} with per-row local state) OR force remount with key={`${it.id}-${it.price}`} so quick-rate/bulk-import price updates reflect in the row immediately.",
+    "Items.jsx QuickRate: fix stale-closure in apply(). Two options: (a) read the value directly from codeRef.current.value inside apply(); or (b) use a ref that mirrors `code` state; or (c) call apply() after a microtask so React has flushed state. Otherwise one-shot 'b2 199' + Enter can fail intermittently with 'కోడ్ కనబడలేదు'."
+  ],
+  "critical_code_review_comments": [
+    "server.py `list_bills` date range still uses tz-less string boundaries against tz-aware ISO strings — small edge risk around midnight UTC (unchanged from iteration 1).",
+    "auth.jsx: raw admin token stored in localStorage AND set as default axios header. Since backend also sets an httpOnly cookie, dropping localStorage would be more secure — but the current dual-mode is required because the browser cookie is SameSite=None+Secure and cross-site XHR requires credentials; leaving as-is is acceptable.",
+    "Login flow: brute-force lockout uses `request.client.host` + email; behind a proxy this is the proxy IP so effectively per-account lockout. Acceptable, but note that a shared kiosk pattern (this app is single admin) is fine.",
+    "Items.jsx savePrice ignores errors — a failed PUT would silently show a success toast. Wrap in try/catch.",
+    "Billing.jsx `save()` awaits `api.customers()` between resetting lines and calling window.print(); if the customers call is slow the print delay drifts. Consider printing before refetching customers."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml", "/app/test_reports/iteration_2.json"],
+  "success_rate": {"backend": "100% (13/13 pytest)", "frontend": "100% of listed flows, with 2 medium bugs on Items page (data still persists correctly)"},
+  "test_credentials": "admin@ushakirana.in / usha@123 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "POST /api/seed is called at start of pytest session; frontend Billing page also auto-seeds on mount.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend fully covered by /app/backend/tests/backend_test.py (13 tests, includes Auth/Settings). It uses env var REACT_APP_BACKEND_URL — export it before running. For frontend automation: (1) ALWAYS add init script overriding window.print (Billing/History/Report trigger it). (2) Log in first via [data-testid=login-email-input/login-password-input/login-submit-btn]. (3) Bearer token also accepted for backend calls if you need to seed/verify from python side. (4) Customer list buttons use data-testid=customer-<uuid> — do NOT use ^='customer-' prefix selector because customer-name-input on the same page also starts with that. (5) Bill numbers cumulate across runs; recent state: rameష్ గారు balance ~₹1,211 after this iteration."
+}
