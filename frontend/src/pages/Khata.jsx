@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { UserPlus, IndianRupee } from "lucide-react";
+import { UserPlus, IndianRupee, Printer } from "lucide-react";
 import { api, rupee, MODE_TE } from "@/lib/api";
 import TeluguInput from "@/components/TeluguInput";
+
+const thisMonth = () => new Date().toISOString().slice(0, 7);
 
 export default function Khata() {
   const [customers, setCustomers] = useState([]);
@@ -12,6 +14,19 @@ export default function Khata() {
   const [phone, setPhone] = useState("");
   const [amt, setAmt] = useState("");
   const [mode, setMode] = useState("cash");
+  const [month, setMonth] = useState(thisMonth());
+  const [stmt, setStmt] = useState(null);
+  const [shop, setShop] = useState({ name: "ఉష కిరాణా", phone: "", address: "" });
+
+  useEffect(() => {
+    api.settings().then(setShop).catch(() => {});
+  }, []);
+
+  const printStatement = async () => {
+    const s = await api.statement(sel.id, month);
+    setStmt(s);
+    setTimeout(() => window.print(), 250);
+  };
 
   const load = async () => setCustomers(await api.customers());
   useEffect(() => {
@@ -47,7 +62,8 @@ export default function Khata() {
   const totalDue = customers.reduce((s, c) => s + (c.balance || 0), 0);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <>
+    <div className="no-print grid grid-cols-1 lg:grid-cols-3 gap-4">
       <div className="space-y-4">
         <div className="border border-amber-200 bg-amber-50 p-4 rounded-lg">
           <div className="text-xs font-bold uppercase tracking-wider text-amber-700">మొత్తం బాకీ</div>
@@ -144,6 +160,26 @@ export default function Khata() {
               </button>
             </div>
 
+            <div className="flex flex-wrap items-end gap-2 border border-slate-200 rounded-md p-3">
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">నెల స్టేట్‌మెంట్</label>
+                <input
+                  data-testid="statement-month-input"
+                  type="month"
+                  value={month}
+                  onChange={(e) => setMonth(e.target.value)}
+                  className="block px-3 py-2 border-2 border-slate-300 rounded-md num"
+                />
+              </div>
+              <button
+                data-testid="print-statement-btn"
+                onClick={printStatement}
+                className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-semibold active:scale-95 transition-colors"
+              >
+                <Printer className="h-4 w-4" /> స్టేట్‌మెంట్ ప్రింట్
+              </button>
+            </div>
+
             <table className="w-full border-collapse text-sm" data-testid="ledger-table">
               <thead className="bg-slate-100 text-[11px] uppercase text-slate-500">
                 <tr>
@@ -174,6 +210,65 @@ export default function Khata() {
           </div>
         )}
       </div>
+    </div>
+    <div id="print-area">{stmt && <Statement stmt={stmt} shop={shop} />}</div>
+    </>
+  );
+}
+
+const dash = { borderTop: "1px dashed #000", margin: "4px 0" };
+
+function Statement({ stmt, shop }) {
+  const row = { display: "flex", justifyContent: "space-between", fontSize: 11 };
+  return (
+    <div style={{ fontFamily: "'Noto Sans Telugu', sans-serif", fontSize: 11 }}>
+      <div style={{ textAlign: "center", fontWeight: 700, fontSize: 15 }}>{shop.name}</div>
+      {shop.address && <div style={{ textAlign: "center", fontSize: 10 }}>{shop.address}</div>}
+      {shop.phone && <div style={{ textAlign: "center", fontSize: 10 }}>ఫోన్: {shop.phone}</div>}
+      <div style={dash} />
+      <div style={{ textAlign: "center", fontWeight: 700 }}>ఖాతా స్టేట్‌మెంట్ — {stmt.month}</div>
+      <div style={{ fontSize: 11 }}>కస్టమర్: {stmt.customer.name_te}</div>
+      {stmt.customer.phone && <div style={{ fontSize: 10 }}>ఫోన్: {stmt.customer.phone}</div>}
+      <div style={dash} />
+      <table style={{ width: "100%", fontSize: 10 }}>
+        <thead>
+          <tr>
+            <th style={{ textAlign: "left" }}>తేదీ</th>
+            <th style={{ textAlign: "left" }}>వివరం</th>
+            <th style={{ textAlign: "right" }}>బాకీ</th>
+            <th style={{ textAlign: "right" }}>జమ</th>
+          </tr>
+        </thead>
+        <tbody>
+          {stmt.txns.map((t) => (
+            <tr key={t.id}>
+              <td>{new Date(t.created_at).toLocaleDateString("en-IN")}</td>
+              <td>{t.type === "bill" ? `బిల్లు #${t.bill_no}` : `చెల్లింపు (${MODE_TE[t.mode] || ""})`}</td>
+              <td style={{ textAlign: "right" }}>{t.type === "bill" ? t.amount.toFixed(2) : ""}</td>
+              <td style={{ textAlign: "right" }}>{t.type === "payment" ? t.amount.toFixed(2) : ""}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div style={dash} />
+      <div style={row}>
+        <span>నెల ప్రారంభ బాకీ</span>
+        <span>{rupee(stmt.opening)}</span>
+      </div>
+      <div style={row}>
+        <span>ఈ నెల కొనుగోళ్లు</span>
+        <span>{rupee(stmt.billed)}</span>
+      </div>
+      <div style={row}>
+        <span>ఈ నెల చెల్లింపులు</span>
+        <span>-{rupee(stmt.paid)}</span>
+      </div>
+      <div style={{ ...row, fontWeight: 700, fontSize: 13 }}>
+        <span>ఇప్పటి బాకీ</span>
+        <span>{rupee(stmt.closing)}</span>
+      </div>
+      <div style={dash} />
+      <div style={{ textAlign: "center", fontWeight: 700 }}>ఇది అంచనా స్టేట్‌మెంట్ మాత్రమే</div>
     </div>
   );
 }

@@ -37,6 +37,15 @@ Kirana shopkeeper at the counter — keyboard-first, fast, Telugu-reading, print
 - POS: category filter chips, `/` hotkey to focus search.
 - Paper bills only — no WhatsApp/SMS sharing (explicit user decision).
 
+- Stock tracking (2026-06): `stock` + `min_stock` per item, auto-decrement on every bill line, inline stock edit, low-stock banner on Items page and red stock note on POS quick cards. `POST /api/items/{id}/stock`.
+- Khata month statement: `GET /api/customers/{id}/statement?month=YYYY-MM` (opening / billed / paid / closing) + printable thermal statement.
+- Monthly item-wise sales report: `GET /api/report/monthly?month=YYYY-MM` → item × day quantity matrix, day totals, payment-mode split; printable page at `/month`.
+- Custom shortcuts from the billing screen: "కోడ్‌లు మార్చు" toggle turns every quick-item card's code into an editable field.
+- Printer setup guide (Telugu, step-by-step) inside the Settings page.
+
+- Weekly report (2026-06): `GET /api/report/weekly?week_start=YYYY-MM-DD` (Monday-based) → 7-day item × day quantity matrix, day totals/counts, payment-mode split, daily average, best day. Page `/week` with prev/next week navigation and print.
+- Verified iteration 5: backend 22/22 pytest, frontend 100% (all 9 routes compile, mobile-safe at 390px, e2e smoke pass). LAUNCH-READY, awaiting user go-ahead.
+
 ## Backlog
 - P1: WhatsApp/SMS bill share; per-customer khata statement print.
 - P1: Barcode scanner input; stock/inventory tracking with low-stock alerts.

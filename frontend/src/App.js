@@ -6,6 +6,8 @@ import {
   Upload,
   NotebookPen,
   BarChart3,
+  CalendarRange,
+  CalendarDays,
   ReceiptText,
   Store,
   LogOut,
@@ -17,6 +19,8 @@ import Items from "@/pages/Items";
 import PriceImport from "@/pages/PriceImport";
 import Khata from "@/pages/Khata";
 import Report from "@/pages/Report";
+import MonthReport from "@/pages/MonthReport";
+import WeekReport from "@/pages/WeekReport";
 import BillHistory from "@/pages/BillHistory";
 import Settings from "@/pages/Settings";
 
@@ -27,6 +31,8 @@ const NAV = [
   { to: "/khata", label: "ఖాతా", icon: NotebookPen, id: "nav-khata" },
   { to: "/history", label: "పాత బిల్లులు", icon: ReceiptText, id: "nav-history" },
   { to: "/report", label: "రోజు నివేదిక", icon: BarChart3, id: "nav-report" },
+  { to: "/week", label: "వారం నివేదిక", icon: CalendarDays, id: "nav-week" },
+  { to: "/month", label: "నెల నివేదిక", icon: CalendarRange, id: "nav-month" },
   { to: "/settings", label: "దుకాణం వివరాలు", icon: Store, id: "nav-settings" },
 ];
 
@@ -89,6 +95,8 @@ function Gate() {
         <Route path="/khata" element={<Khata />} />
         <Route path="/history" element={<BillHistory />} />
         <Route path="/report" element={<Report />} />
+        <Route path="/week" element={<WeekReport />} />
+        <Route path="/month" element={<MonthReport />} />
         <Route path="/settings" element={<Settings />} />
       </Routes>
     </Shell>

@@ -1,0 +1,47 @@
+{
+  "summary": "Iteration 4 — FINAL pre-launch verification. Backend: 22/22 pytest pass including 4 new /api/report/weekly tests (default-this-week, Monday snap by frontend / server accepts given date, empty week zeros, totals-match-bills). Frontend: FOUND & FIXED a critical build-breaker in MonthReport.jsx (leftover cruft 'v>\\n    </div>\\n  );\\n}' after line 124 caused the WHOLE app to fail webpack compile → red overlay 'Compiled with problems: SyntaxError Unexpected token (126:5)'. After fix, verified: (a) Items saveCode retest fully green — no pageerror, no webpack overlay, a3→a3z persists and reverts, duplicate a3→b1 rejected (a3 kept, b1 row unchanged), (b) inline savePrice + saveStock throw no runtime errors, (c) /week loads, week-matrix + day-total row + summary cards render, week-start-input snaps 2026-01-14 (Wed) → 2026-01-12 (Mon), week-prev/next shift by 7 days correctly, item search filters rows, (d) mobile /week has NO horizontal overflow (scrollW=clientW=390). HOWEVER /month mobile overflow LOW bug from iteration 3 is NOT actually fixed — body.scrollWidth=478 vs 390 (88px overflow). Main agent's iteration-4 description claimed 'outer wrapper overflow-x-hidden, matrix card min-w-0' but MonthReport.jsx line 21 still just has className='space-y-4' and the matrix parent lacks min-w-0.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "MonthReport.jsx – trailing cruft after end of component",
+        "issue": "Lines 125-128 contained 'v>\\n    </div>\\n  );\\n}' after the function's real closing brace, causing SyntaxError: Unexpected token (126:5) and a full-page red 'Compiled with problems' overlay preventing ANY page from loading. Testing agent removed the extraneous lines; app now compiles.",
+        "selector": "/app/frontend/src/pages/MonthReport.jsx (lines 125-128)",
+        "priority": "CRITICAL (FIXED by test agent)"
+      },
+      {
+        "component": "MonthReport.jsx – mobile 390x844 horizontal overflow",
+        "issue": "Iteration-4 changelog says 'outer wrapper overflow-x-hidden, matrix card min-w-0' but the file still has line 21 `<div id=\"print-report\" className=\"space-y-4\">` (no overflow-x-hidden) and the matrix card grid child has no min-w-0. Result: on 390x844, body.scrollWidth=478 vs clientWidth=390 (88px page-level horizontal scroll). Same LOW bug from iteration 3 remains. Suggested fix: change className to 'space-y-4 max-w-full overflow-x-hidden' and add min-w-0 to the parent of the matrix card (mirror WeekReport.jsx line 34, line 104 which correctly does this).",
+        "selector": "[data-testid='month-matrix']",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "IMPORTANT PROCESS: run `yarn build` (or webpack) in CI to catch syntax errors before shipping. The iteration-4 MonthReport.jsx would never have started the app.",
+    "Apply the /month mobile fix that was described in the iteration notes: MonthReport.jsx line 21 outer div → add ' max-w-full overflow-x-hidden' to className; ensure the parent flex/grid child of the matrix card has min-w-0 (see WeekReport.jsx as reference which is correct and has 0 overflow on mobile)."
+  ],
+  "critical_code_review_comments": [
+    "MonthReport.jsx had trailing garbage that broke webpack compile — indicates a botched search/replace by the main agent. Add prettier/eslint pre-commit and `yarn build` smoke on every PR.",
+    "Items.jsx savePrice/saveCode/saveStock now correctly use try/catch and surface backend Telugu detail via toast.error — verified end-to-end.",
+    "WeekReport.jsx frontend snaps date to Monday via mondayOf() while the server accepts any date verbatim — acceptable (frontend guarantees Monday). Optional: enforce Monday snap on server too so external callers/curl can't produce mid-week weeks.",
+    "WeekReport.jsx uses r.days as keys for per_day (full YYYY-MM-DD) which matches the server contract — good and different from MonthReport which uses DD only. Contract documented via the test suite now.",
+    "backend weekly_report modes dict is always full {cash,upi,card,khata:0.0} — good; frontend blindly iterates modes so no missing-key crash."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (added TestWeeklyReport with 4 tests)",
+    "/app/frontend/src/pages/MonthReport.jsx (removed 4 lines of cruft that broke webpack)",
+    "/app/test_reports/pytest/pytest_results.xml",
+    "/app/test_reports/iteration_4.json"
+  ],
+  "success_rate": {"backend": "100% (22/22 pytest)", "frontend": "~95% — all iteration-4 items verified except /month mobile overflow which was not actually fixed by the main agent"},
+  "test_credentials": "admin@ushakirana.in / usha@123 (/app/memory/test_credentials.md)",
+  "seed_data_creation": "POST /api/seed run via pytest session fixture; new weekly-report tests create one cash bill of c1×4 in the current week and verify gross/day_totals/per_day deltas.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Login via [data-testid=login-email-input] / login-password-input / login-submit-btn. Billing uses [data-testid=pos-search-input] (NOT billing-code-input), suggestions [data-testid=suggestion-<code>], cart lines [data-testid=bill-line-<code>], checkout-btn. Always add init script overriding window.print because Billing save + all report pages call it. Week report: [data-testid=week-matrix, week-start-input, week-prev-btn, week-next-btn, week-item-search, print-week-btn, week-row-<code>, week-stat-<label>]. Items retest: change item-code-a3 input value and blur; verify item-code-a3z exists and no pageerror. All 22 backend tests currently green.",
+  "rca of the issue": "MonthReport.jsx was left with trailing garbage 'v>\\n    </div>\\n  );\\n}' after line 124 (the real end of the component). Webpack babel-loader threw 'SyntaxError: Unexpected token (126:5)' and CRA showed a full-screen red overlay so no page could load — INCLUDING /items, /week, /login. Repro: `curl http://localhost:3000` after any route → shows the overlay. Mitigation applied: deleted lines 125-128. Root cause is a bad search_replace edit while the main agent was applying the mobile-overflow fix; the intended fix (outer wrapper overflow-x-hidden + min-w-0) was also NOT applied — please redo that edit cleanly."
+}

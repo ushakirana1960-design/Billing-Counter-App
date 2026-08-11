@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Literal
 import uuid
 from datetime import datetime, timezone, date
+import calendar
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -123,6 +124,8 @@ class Item(BaseModel):
     unit: str = "కేజీ"
     price: float = 0
     category: str = "సాధారణ"
+    stock: float = 0
+    min_stock: float = 0
     updated_at: str = Field(default_factory=now_iso)
 
 
@@ -133,6 +136,14 @@ class ItemIn(BaseModel):
     unit: str = "కేజీ"
     price: float = 0
     category: str = "సాధారణ"
+    stock: float = 0
+    min_stock: float = 0
+
+
+class StockIn(BaseModel):
+    add: float = 0
+    set_stock: Optional[float] = None
+    min_stock: Optional[float] = None
 
 
 class PriceRow(BaseModel):
@@ -231,6 +242,22 @@ async def update_item(item_id: str, payload: ItemIn):
     return Item(**{**doc, **upd})
 
 
+@api_router.post("/items/{item_id}/stock", response_model=Item)
+async def update_stock(item_id: str, payload: StockIn):
+    doc = await db.items.find_one({"id": item_id}, NO_ID)
+    if not doc:
+        raise HTTPException(404, "వస్తువు కనబడలేదు")
+    stock = float(doc.get("stock", 0))
+    if payload.set_stock is not None:
+        stock = payload.set_stock
+    stock = round(stock + payload.add, 3)
+    upd = {"stock": stock, "updated_at": now_iso()}
+    if payload.min_stock is not None:
+        upd["min_stock"] = payload.min_stock
+    await db.items.update_one({"id": item_id}, {"$set": upd})
+    return Item(**{**doc, **upd})
+
+
 @api_router.delete("/items/{item_id}")
 async def delete_item(item_id: str):
     await db.items.delete_one({"id": item_id})
@@ -293,6 +320,26 @@ async def ledger(customer_id: str):
     return {"customer": c, "txns": txns}
 
 
+@api_router.get("/customers/{customer_id}/statement")
+async def statement(customer_id: str, month: Optional[str] = None):
+    c = await db.customers.find_one({"id": customer_id}, NO_ID)
+    if not c:
+        raise HTTPException(404, "కస్టమర్ కనబడలేదు")
+    month = month or date.today().strftime("%Y-%m")
+    start = f"{month}-01T00:00:00"
+    y, m = (int(x) for x in month.split("-"))
+    nxt = f"{y + 1}-01-01T00:00:00" if m == 12 else f"{y}-{m + 1:02d}-01T00:00:00"
+    before = await db.khata.find({"customer_id": customer_id, "created_at": {"$lt": start}}, NO_ID).to_list(2000)
+    opening = round(sum(t["amount"] if t["type"] == "bill" else -t["amount"] for t in before), 2)
+    txns = await db.khata.find({"customer_id": customer_id,
+                                "created_at": {"$gte": start, "$lt": nxt}},
+                               NO_ID).sort("created_at", 1).to_list(1000)
+    billed = round(sum(t["amount"] for t in txns if t["type"] == "bill"), 2)
+    paid = round(sum(t["amount"] for t in txns if t["type"] == "payment"), 2)
+    return {"customer": c, "month": month, "opening": opening, "billed": billed,
+            "paid": paid, "closing": round(opening + billed - paid, 2), "txns": txns}
+
+
 @api_router.post("/customers/{customer_id}/payment")
 async def settle(customer_id: str, payload: PaymentIn):
     c = await db.customers.find_one({"id": customer_id}, NO_ID)
@@ -333,6 +380,9 @@ async def create_bill(payload: BillIn):
                 total=total, payment_mode=payload.payment_mode, customer_id=payload.customer_id,
                 customer_name=cust_name, note=payload.note)
     await db.bills.insert_one(bill.model_dump())
+    for l in payload.lines:
+        if l.item_id:
+            await db.items.update_one({"id": l.item_id}, {"$inc": {"stock": -l.qty}})
     if payload.payment_mode == "khata":
         await db.khata.insert_one({"id": str(uuid.uuid4()), "customer_id": payload.customer_id,
                                    "type": "bill", "amount": total, "bill_id": bill.id,
@@ -410,6 +460,83 @@ async def daily_report(day: Optional[str] = None):
         "cash_in_hand": round(modes["cash"] + khata_collected["cash"], 2),
         "top_items": sorted(item_map.values(), key=lambda x: -x["amount"])[:15],
         "bills": bills,
+    }
+
+
+@api_router.get("/report/weekly")
+async def weekly_report(week_start: Optional[str] = None):
+    if week_start:
+        start_d = date.fromisoformat(week_start)
+    else:
+        today = date.today()
+        start_d = today - timedelta(days=today.weekday())  # Monday
+    days = [(start_d + timedelta(days=i)).isoformat() for i in range(7)]
+    end_excl = (start_d + timedelta(days=7)).isoformat()
+    bills = await db.bills.find({"created_at": {"$gte": f"{start_d.isoformat()}T00:00:00",
+                                                "$lt": f"{end_excl}T00:00:00"}},
+                                NO_ID).to_list(5000)
+    items = {}
+    day_totals = {d: 0.0 for d in days}
+    day_counts = {d: 0 for d in days}
+    modes = {"cash": 0.0, "upi": 0.0, "card": 0.0, "khata": 0.0}
+    for b in bills:
+        d = b["created_at"][:10]
+        if d in day_totals:
+            day_totals[d] = round(day_totals[d] + b["total"], 2)
+            day_counts[d] += 1
+        modes[b["payment_mode"]] = round(modes[b["payment_mode"]] + b["total"], 2)
+        for line in b["lines"]:
+            e = items.setdefault(line["code"], {"code": line["code"], "name_te": line["name_te"],
+                                                "unit": line.get("unit", ""), "qty": 0, "amount": 0,
+                                                "per_day": {}})
+            e["qty"] = round(e["qty"] + line["qty"], 3)
+            e["amount"] = round(e["amount"] + line["total"], 2)
+            e["per_day"][d] = round(e["per_day"].get(d, 0) + line["qty"], 3)
+    gross = round(sum(day_totals.values()), 2)
+    active_days = len([d for d in days if day_counts[d]]) or 1
+    return {
+        "week_start": start_d.isoformat(),
+        "week_end": days[-1],
+        "days": days,
+        "bill_count": len(bills),
+        "gross": gross,
+        "avg_per_day": round(gross / active_days, 2),
+        "modes": modes,
+        "day_totals": day_totals,
+        "day_counts": day_counts,
+        "items": sorted(items.values(), key=lambda x: -x["amount"]),
+    }
+
+
+@api_router.get("/report/monthly")
+async def monthly_report(month: Optional[str] = None):
+    month = month or date.today().strftime("%Y-%m")
+    y, m = (int(x) for x in month.split("-"))
+    start = f"{month}-01T00:00:00"
+    nxt = f"{y + 1}-01-01T00:00:00" if m == 12 else f"{y}-{m + 1:02d}-01T00:00:00"
+    bills = await db.bills.find({"created_at": {"$gte": start, "$lt": nxt}}, NO_ID).to_list(5000)
+    items = {}
+    day_totals = {}
+    modes = {"cash": 0.0, "upi": 0.0, "card": 0.0, "khata": 0.0}
+    for b in bills:
+        d = b["created_at"][8:10]
+        day_totals[d] = round(day_totals.get(d, 0) + b["total"], 2)
+        modes[b["payment_mode"]] = round(modes[b["payment_mode"]] + b["total"], 2)
+        for line in b["lines"]:
+            e = items.setdefault(line["code"], {"code": line["code"], "name_te": line["name_te"],
+                                                "unit": line.get("unit", ""), "qty": 0, "amount": 0, "per_day": {}})
+            e["qty"] = round(e["qty"] + line["qty"], 3)
+            e["amount"] = round(e["amount"] + line["total"], 2)
+            e["per_day"][d] = round(e["per_day"].get(d, 0) + line["qty"], 3)
+    days = [f"{i:02d}" for i in range(1, calendar.monthrange(y, m)[1] + 1)]
+    return {
+        "month": month,
+        "days": days,
+        "bill_count": len(bills),
+        "gross": round(sum(b["total"] for b in bills), 2),
+        "modes": modes,
+        "day_totals": day_totals,
+        "items": sorted(items.values(), key=lambda x: -x["amount"]),
     }
 
 

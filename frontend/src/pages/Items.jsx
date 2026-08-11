@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Trash2, Save, Plus, Zap } from "lucide-react";
+import { Trash2, Save, Plus, Zap, AlertTriangle } from "lucide-react";
 import { api, rupee } from "@/lib/api";
 import TeluguInput from "@/components/TeluguInput";
 
-const EMPTY = { code: "", name_te: "", name_en: "", unit: "కేజీ", price: "", category: "సాధారణ" };
+const EMPTY = { code: "", name_te: "", name_en: "", unit: "కేజీ", price: "", category: "సాధారణ", stock: "", min_stock: "" };
 
 export default function Items() {
   const [items, setItems] = useState([]);
@@ -19,7 +19,12 @@ export default function Items() {
   const add = async () => {
     if (!form.code || !form.name_te) return toast.error("కోడ్ మరియు పేరు అవసరం");
     try {
-      await api.createItem({ ...form, price: Number(form.price) || 0 });
+      await api.createItem({
+        ...form,
+        price: Number(form.price) || 0,
+        stock: Number(form.stock) || 0,
+        min_stock: Number(form.min_stock) || 0,
+      });
       setForm(EMPTY);
       toast.success("వస్తువు జోడించబడింది");
       load();
@@ -29,8 +34,36 @@ export default function Items() {
   };
 
   const savePrice = async (it, price) => {
-    await api.updateItem(it.id, { ...it, price: Number(price) || 0 });
-    toast.success(`${it.name_te} రేటు మార్చబడింది`);
+    try {
+      await api.updateItem(it.id, { ...it, price: Number(price) || 0 });
+      toast.success(`${it.name_te} రేటు మార్చబడింది`);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "రేటు మార్చడం విఫలమైంది");
+    }
+    load();
+  };
+
+  const saveCode = async (it, code) => {
+    const c = code.trim().toLowerCase();
+    if (!c || c === it.code) return;
+    try {
+      await api.updateItem(it.id, { ...it, code: c });
+      toast.success(`${it.name_te} కోడ్ ఇప్పుడు ${c}`);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "కోడ్ మార్చడం విఫలమైంది");
+    }
+    load();
+  };
+
+  const saveStock = async (it, v) => {
+    const n = Number(v);
+    if (Number.isNaN(n) || n === (it.stock ?? 0)) return;
+    try {
+      await api.updateStock(it.id, { set_stock: n });
+      toast.success(`${it.name_te} నిల్వ ${n} ${it.unit}`);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "నిల్వ మార్చడం విఫలమైంది");
+    }
     load();
   };
 
@@ -41,10 +74,29 @@ export default function Items() {
   };
 
   const shown = items.filter((i) => !q || i.code.includes(q.toLowerCase()) || i.name_te.includes(q));
+  const lowStock = items.filter((i) => (i.min_stock ?? 0) > 0 && (i.stock ?? 0) <= i.min_stock);
 
   return (
     <div className="space-y-4">
       <QuickRate items={items} onDone={load} />
+      {lowStock.length > 0 && (
+        <div data-testid="low-stock-banner" className="border-2 border-rose-200 bg-rose-50 rounded-lg p-3">
+          <div className="flex items-center gap-2 mb-1">
+            <AlertTriangle className="h-4 w-4 text-rose-600" />
+            <span className="font-bold text-rose-800">నిల్వ తగ్గిన వస్తువులు ({lowStock.length})</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {lowStock.map((i) => (
+              <span key={i.id} className="text-xs bg-white border border-rose-200 rounded px-2 py-1">
+                <span className="num font-bold">{i.code}</span> {i.name_te} —{" "}
+                <span className="num font-bold text-rose-700">
+                  {i.stock} {i.unit}
+                </span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 h-fit">
         <h2 className="text-xl font-bold">కొత్త వస్తువు</h2>
@@ -93,6 +145,26 @@ export default function Items() {
             </select>
           </div>
         </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">నిల్వ (స్టాక్)</label>
+            <input
+              data-testid="item-stock-input"
+              value={form.stock}
+              onChange={(e) => setForm({ ...form, stock: e.target.value })}
+              className="w-full px-3 py-2 border-2 border-slate-300 rounded-md num focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">హెచ్చరిక స్థాయి</label>
+            <input
+              data-testid="item-minstock-input"
+              value={form.min_stock}
+              onChange={(e) => setForm({ ...form, min_stock: e.target.value })}
+              className="w-full px-3 py-2 border-2 border-slate-300 rounded-md num focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+        </div>
         <button
           data-testid="add-item-btn"
           onClick={add}
@@ -119,6 +191,7 @@ export default function Items() {
                 <th className="p-2 text-left w-20">కోడ్</th>
                 <th className="p-2 text-left">పేరు</th>
                 <th className="p-2 text-right">రేటు</th>
+                <th className="p-2 text-right w-28">నిల్వ</th>
                 <th className="w-20"></th>
               </tr>
             </thead>
@@ -144,6 +217,19 @@ export default function Items() {
                       defaultValue={it.price}
                       onBlur={(e) => Number(e.target.value) !== it.price && savePrice(it, e.target.value)}
                       className="w-24 px-2 py-1 text-right border border-slate-300 rounded num"
+                    />
+                  </td>
+                  <td className="p-1 text-right">
+                    <input
+                      key={`stock-${it.id}-${it.stock}`}
+                      data-testid={`item-stock-${it.code}`}
+                      defaultValue={it.stock ?? 0}
+                      onBlur={(e) => saveStock(it, e.target.value)}
+                      className={`w-20 px-2 py-1 text-right border rounded num ${
+                        (it.min_stock ?? 0) > 0 && (it.stock ?? 0) <= it.min_stock
+                          ? "border-rose-400 bg-rose-50 text-rose-700 font-bold"
+                          : "border-slate-300"
+                      }`}
                     />
                   </td>
                   <td className="p-2 text-right">

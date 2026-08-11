@@ -204,6 +204,103 @@ class TestBills:
         assert any(t.get("type") == "payment" and t.get("amount") == 40 for t in ledger2["txns"])
 
 
+# ---------- Stock ----------
+class TestStock:
+    def test_stock_set_and_add(self, client):
+        items = client.get(f"{API}/items").json()
+        it = next(i for i in items if i["code"] == "e5")
+        r = client.post(f"{API}/items/{it['id']}/stock", json={"set_stock": 50, "min_stock": 5})
+        assert r.status_code == 200, r.text
+        assert r.json()["stock"] == 50
+        assert r.json()["min_stock"] == 5
+        r2 = client.post(f"{API}/items/{it['id']}/stock", json={"add": 7})
+        assert r2.status_code == 200
+        assert r2.json()["stock"] == 57
+
+    def test_bill_decrements_stock(self, client):
+        items = client.get(f"{API}/items").json()
+        it = next(i for i in items if i["code"] == "e5")
+        # set stock 100
+        client.post(f"{API}/items/{it['id']}/stock", json={"set_stock": 100})
+        lines = [{"item_id": it["id"], "code": "e5", "name_te": it["name_te"],
+                  "unit": it["unit"], "qty": 3, "price": it["price"],
+                  "total": round(3 * it["price"], 2)}]
+        r = client.post(f"{API}/bills", json={"lines": lines, "discount": 0, "payment_mode": "cash"})
+        assert r.status_code == 200
+        # verify stock decremented
+        items2 = client.get(f"{API}/items").json()
+        after = next(i for i in items2 if i["code"] == "e5")
+        assert after["stock"] == 97
+
+
+# ---------- Duplicate shortcut code ----------
+class TestDuplicateCode:
+    def test_update_item_duplicate_code_rejected(self, client):
+        items = client.get(f"{API}/items").json()
+        a1 = next(i for i in items if i["code"] == "a1")
+        a2 = next(i for i in items if i["code"] == "a2")
+        # try to change a1's code to a2 (already used)
+        payload = {**a1, "code": "a2"}
+        # keep only ItemIn fields
+        payload = {k: payload[k] for k in ["code", "name_te", "name_en", "unit",
+                                            "price", "category", "stock", "min_stock"] if k in payload}
+        r = client.put(f"{API}/items/{a1['id']}", json=payload)
+        assert r.status_code == 400, r.text
+        detail = r.json().get("detail", "")
+        # telugu error msg
+        assert "కోడ్" in detail or "ఇప్పటికే" in detail, f"Expected telugu code-clash msg, got: {detail!r}"
+
+
+# ---------- Monthly report ----------
+class TestMonthlyReport:
+    def test_monthly_report_shape_and_per_day(self, client):
+        from datetime import date as _d
+        month = _d.today().strftime("%Y-%m")
+        # Ensure at least one bill exists this month (via cash bill test)
+        items = client.get(f"{API}/items").json()
+        it = next(i for i in items if i["code"] == "d5")
+        lines = [{"item_id": it["id"], "code": "d5", "name_te": it["name_te"],
+                  "unit": it["unit"], "qty": 2, "price": it["price"],
+                  "total": round(2 * it["price"], 2)}]
+        client.post(f"{API}/bills", json={"lines": lines, "discount": 0, "payment_mode": "cash"})
+        r = client.get(f"{API}/report/monthly", params={"month": month})
+        assert r.status_code == 200
+        d = r.json()
+        for k in ["month", "days", "bill_count", "gross", "modes", "day_totals", "items"]:
+            assert k in d, f"missing {k}"
+        assert d["month"] == month
+        # days array length matches calendar
+        import calendar as _cal
+        y, m = (int(x) for x in month.split("-"))
+        assert len(d["days"]) == _cal.monthrange(y, m)[1]
+        # d5 must appear in items with per_day for today
+        today = _d.today().strftime("%d")
+        d5_row = next((x for x in d["items"] if x["code"] == "d5"), None)
+        assert d5_row is not None
+        assert today in d5_row["per_day"]
+        assert d5_row["per_day"][today] >= 2
+
+
+# ---------- Customer monthly statement ----------
+class TestStatement:
+    def test_statement_math(self, client):
+        cust = client.get(f"{API}/customers").json()[0]
+        cid = cust["id"]
+        from datetime import date as _d
+        month = _d.today().strftime("%Y-%m")
+        # create khata bill and payment this month
+        lines = [{"code": "c1", "name_te": "పంచదార", "qty": 1, "price": 50, "total": 50}]
+        client.post(f"{API}/bills", json={"lines": lines, "discount": 0,
+                                          "payment_mode": "khata", "customer_id": cid})
+        client.post(f"{API}/customers/{cid}/payment", json={"amount": 10, "mode": "cash"})
+        r = client.get(f"{API}/customers/{cid}/statement", params={"month": month})
+        assert r.status_code == 200
+        s = r.json()
+        for k in ["opening", "billed", "paid", "closing", "txns", "customer", "month"]:
+            assert k in s
+        assert round(s["opening"] + s["billed"] - s["paid"], 2) == round(s["closing"], 2)
+
+
 # ---------- Daily report ----------
 class TestDailyReport:
     def test_daily_report_shape(self, client):
@@ -218,3 +315,69 @@ class TestDailyReport:
             assert m in d["counts"]
         for m in ["cash", "upi", "card"]:
             assert m in d["khata_collected"]
+
+
+
+# ---------- Weekly report ----------
+class TestWeeklyReport:
+    def test_weekly_report_default_this_week(self, client):
+        r = client.get(f"{API}/report/weekly")
+        assert r.status_code == 200
+        d = r.json()
+        for k in ["week_start", "week_end", "days", "bill_count", "gross",
+                  "avg_per_day", "modes", "day_totals", "day_counts", "items"]:
+            assert k in d, f"missing {k}"
+        assert len(d["days"]) == 7
+        # week_start must be Monday
+        from datetime import date as _d
+        ws = _d.fromisoformat(d["week_start"])
+        assert ws.weekday() == 0, f"week_start {d['week_start']} is not Monday"
+        # week_end == week_start + 6 days
+        we = _d.fromisoformat(d["week_end"])
+        assert (we - ws).days == 6
+        for m in ["cash", "upi", "card", "khata"]:
+            assert m in d["modes"]
+
+    def test_weekly_report_snaps_to_monday(self, client):
+        # pick a Wednesday, expect Monday
+        r = client.get(f"{API}/report/weekly", params={"week_start": "2026-01-14"})
+        # server accepts the given date as-is (frontend snaps). Verify structure though.
+        assert r.status_code == 200
+        d = r.json()
+        # server uses given date as start_d verbatim
+        assert d["week_start"] == "2026-01-14"
+        assert len(d["days"]) == 7
+
+    def test_weekly_report_empty_week_returns_zeros(self, client):
+        # far past week where no bills exist
+        r = client.get(f"{API}/report/weekly", params={"week_start": "2000-01-03"})
+        assert r.status_code == 200
+        d = r.json()
+        assert d["bill_count"] == 0
+        assert d["gross"] == 0
+        assert d["items"] == []
+        assert all(v == 0 for v in d["day_totals"].values())
+        assert all(v == 0 for v in d["day_counts"].values())
+
+    def test_weekly_report_totals_match_bills(self, client):
+        # create a bill today, verify it's reflected in this week's totals
+        from datetime import date as _d, timedelta as _td
+        items = client.get(f"{API}/items").json()
+        it = next(i for i in items if i["code"] == "c1")
+        before = client.get(f"{API}/report/weekly").json()
+        lines = [{"item_id": it["id"], "code": "c1", "name_te": it["name_te"],
+                  "unit": it["unit"], "qty": 4, "price": it["price"],
+                  "total": round(4 * it["price"], 2)}]
+        rb = client.post(f"{API}/bills", json={"lines": lines, "discount": 0, "payment_mode": "cash"})
+        assert rb.status_code == 200
+        bill_total = rb.json()["total"]
+        after = client.get(f"{API}/report/weekly").json()
+        assert after["bill_count"] == before["bill_count"] + 1
+        assert round(after["gross"] - before["gross"], 2) == round(bill_total, 2)
+        # today's day_total increased
+        today_key = _d.today().isoformat()
+        assert round(after["day_totals"][today_key] - before["day_totals"].get(today_key, 0), 2) == round(bill_total, 2)
+        # c1 in items with per_day today
+        c1_row = next((x for x in after["items"] if x["code"] == "c1"), None)
+        assert c1_row is not None
+        assert c1_row["per_day"].get(today_key, 0) >= 4

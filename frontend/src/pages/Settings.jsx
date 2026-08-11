@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Save, Store } from "lucide-react";
+import { Save, Store, Printer } from "lucide-react";
 import { api } from "@/lib/api";
 import TeluguInput from "@/components/TeluguInput";
 
@@ -154,6 +154,45 @@ export default function Settings() {
       >
         <Save className="h-4 w-4" /> సేవ్ చెయ్యి
       </button>
+
+      <div className="border-2 border-blue-200 bg-blue-50 rounded-lg p-4 space-y-2" data-testid="printer-help">
+        <div className="flex items-center gap-2">
+          <Printer className="h-5 w-5 text-blue-700" />
+          <h3 className="font-bold text-blue-900">ప్రింటర్ ఎలా కలపాలి?</h3>
+        </div>
+        <ol className="text-sm space-y-1.5 list-decimal pl-5 text-slate-700">
+          <li>
+            థర్మల్ ప్రింటర్ (58mm / 80mm) ను USB తో కంప్యూటర్‌కు కలిపి, దాని డ్రైవర్ ఇన్‌స్టాల్ చేయండి. Windows లో{" "}
+            <span className="font-semibold">Settings → Bluetooth &amp; devices → Printers &amp; scanners → Add device</span>.
+          </li>
+          <li>
+            బిల్లు సేవ్ చేసిన వెంటనే బ్రౌజర్ ప్రింట్ విండో వస్తుంది. అందులో మీ థర్మల్ ప్రింటర్‌ను ఎంచుకోండి.
+          </li>
+          <li>
+            <span className="font-semibold">Paper size</span> లో <span className="num">80mm × 297mm</span> (లేదా Roll
+            Paper 80 / 58) ఎంచుకోండి; <span className="font-semibold">Margins = None</span>,{" "}
+            <span className="font-semibold">Scale = 100%</span>, <span className="font-semibold">Headers and footers</span>{" "}
+            ఆఫ్ చేయండి.
+          </li>
+          <li>
+            Chrome లో <span className="font-semibold">“Use system dialog”</span> కి వెళ్లి ఒకసారి సెట్ చేస్తే, ఆ తర్వాత
+            ప్రతిసారీ అదే సెట్టింగ్ గుర్తుంచుకుంటుంది — Enter కొట్టడమే.
+          </li>
+          <li>
+            అక్షరాలు చిన్నగా/పెద్దగా ఉంటే పైన ఉన్న{" "}
+            <span className="font-semibold">బిల్లు ప్రింట్ అక్షరాల పరిమాణం</span> స్లైడర్‌తో సరిచేయండి.
+          </li>
+          <li>
+            సాధారణ A4 ప్రింటర్ కూడా పనిచేస్తుంది — బిల్లు పేజీ మధ్యలో సన్నని రసీదుగా ప్రింట్ అవుతుంది.
+          </li>
+          <li>
+            బ్లూటూత్ మొబైల్ ప్రింటర్ వాడితే: ఫోన్‌లో ప్రింటర్ జతచేసి, Chrome → Share → Print → ఆ ప్రింటర్ ఎంచుకోండి.
+          </li>
+        </ol>
+        <p className="text-xs text-slate-500">
+          చిట్కా: మొదటిసారి ఒక టెస్ట్ బిల్లు వేసి ప్రింట్ చేసి చూడండి — సైజు సరిపోకపోతే స్లైడర్ మార్చి మళ్ళీ ప్రింట్ చేయండి.
+        </p>
+      </div>
     </div>
   );
 }

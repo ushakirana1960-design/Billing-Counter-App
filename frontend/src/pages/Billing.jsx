@@ -16,7 +16,20 @@ export default function Billing() {
   const [customerId, setCustomerId] = useState("");
   const [lastBill, setLastBill] = useState(null);
   const [cat, setCat] = useState("అన్నీ");
+  const [codeEdit, setCodeEdit] = useState(false);
   const searchRef = useRef(null);
+
+  const saveCode = async (it, code) => {
+    const c = code.trim().toLowerCase();
+    if (!c || c === it.code) return;
+    try {
+      await api.updateItem(it.id, { ...it, code: c });
+      toast.success(`${it.name_te} కోడ్ ఇప్పుడు ${c}`);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "కోడ్ మార్చడం విఫలమైంది");
+    }
+    setItems(await api.items());
+  };
 
   useEffect(() => {
     const onSlash = (e) => {
@@ -258,8 +271,19 @@ export default function Billing() {
           </div>
 
           <div className="bg-white border border-slate-200 rounded-lg p-3">
-            <div className="text-[11px] uppercase tracking-wider text-slate-500 mb-2">
-              త్వరిత వస్తువులు · <span className="num">/</span> నొక్కితే సెర్చ్ బాక్స్‌కు వెళ్తుంది
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="text-[11px] uppercase tracking-wider text-slate-500">
+                త్వరిత వస్తువులు · <span className="num">/</span> నొక్కితే సెర్చ్ బాక్స్‌కు వెళ్తుంది
+              </div>
+              <button
+                data-testid="toggle-code-edit"
+                onClick={() => setCodeEdit(!codeEdit)}
+                className={`text-xs font-bold px-2.5 py-1 rounded-full border transition-colors ${
+                  codeEdit ? "bg-blue-600 text-white border-blue-600" : "border-slate-300 text-slate-600"
+                }`}
+              >
+                {codeEdit ? "కోడ్‌ల మార్పు ఆఫ్" : "కోడ్‌లు మార్చు"}
+              </button>
             </div>
             <div className="flex flex-wrap gap-1.5 mb-2">
               {categories.map((c) => (
@@ -281,16 +305,35 @@ export default function Billing() {
                   <div className="text-xs font-bold text-slate-400 mb-1">{cname}</div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2">
                     {list.map((it) => (
-                      <button
+                      <div
                         key={it.id}
-                        data-testid={`quick-${it.code}`}
-                        onClick={() => addItem(it)}
-                        className="border border-slate-200 rounded-md p-2 text-left hover:border-blue-500 hover:bg-blue-50 active:scale-95 transition-colors"
+                        className="border border-slate-200 rounded-md p-2 hover:border-blue-500 transition-colors"
                       >
-                        <div className="num text-[10px] font-bold text-blue-600">{it.code}</div>
-                        <div className="text-sm font-semibold leading-tight truncate">{it.name_te}</div>
-                        <div className="num text-xs text-slate-500">{rupee(it.price)}</div>
-                      </button>
+                        {codeEdit ? (
+                          <input
+                            key={`c-${it.id}-${it.code}`}
+                            data-testid={`edit-code-${it.code}`}
+                            defaultValue={it.code}
+                            onBlur={(e) => saveCode(it, e.target.value)}
+                            className="w-full mb-1 px-1.5 py-0.5 border border-blue-300 rounded num text-xs font-bold"
+                          />
+                        ) : (
+                          <div className="num text-[10px] font-bold text-blue-600">{it.code}</div>
+                        )}
+                        <button
+                          data-testid={`quick-${it.code}`}
+                          onClick={() => !codeEdit && addItem(it)}
+                          className="w-full text-left active:scale-95 transition-transform"
+                        >
+                          <div className="text-sm font-semibold leading-tight truncate">{it.name_te}</div>
+                          <div className="num text-xs text-slate-500">
+                            {rupee(it.price)}
+                            {it.min_stock > 0 && it.stock <= it.min_stock && (
+                              <span className="text-rose-600 font-bold"> · నిల్వ {it.stock}</span>
+                            )}
+                          </div>
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>

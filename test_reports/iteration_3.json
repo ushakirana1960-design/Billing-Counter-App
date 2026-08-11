@@ -1,0 +1,41 @@
+{
+  "summary": "Iteration 3 for Telugu POS 'ఉష కిరాణా'. Backend: 18/18 pytest pass — added coverage for stock set/add, bill-decrements-stock, monthly report shape+per_day, monthly customer statement (opening+billed-paid==closing), duplicate shortcut code 400 with Telugu message. Frontend: monthly report (matrix, day totals, search, print) works; Khata statement print renders #print-area with 'ఖాతా స్టేట్‌మెంట్' and opening/billed/paid/closing (window.print overridden); Billing code-edit toggle works — duplicate 'a1'->'b1' is rejected with Telugu toast \"'b1' కోడ్ ఇప్పటికే బియ్యం (సోనా మసూరి) కి ఉంది\" and a1 remains; successful rename a1->z9 persists and reverts cleanly; Settings shows printer-help block, 5 ui-scale buttons + receipt-font slider. Mobile /month matrix renders. FOUND 1 CRITICAL frontend regression: Items.jsx blurring the item-code cell throws ReferenceError 'saveCode is not defined' and shows a full-page red webpack-dev error overlay that blocks all interactions on /items.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Items.jsx – inline item-code input (data-testid=item-code-<code>)",
+        "issue": "onBlur calls saveCode(it, e.target.value) but no such function is defined in Items.jsx (saveCode only exists in Billing.jsx). Any blur with a changed value throws 'ReferenceError: saveCode is not defined' — captured via page.on('pageerror') and shown as a red 'Uncaught runtime errors' overlay that intercepts pointer events, breaking the whole /items page. Repro: /items → change value in item-code-a3 input → Tab → red error overlay appears.",
+        "selector": "[data-testid='item-code-<code>']",
+        "priority": "CRITICAL"
+      },
+      {
+        "component": "MonthReport.jsx – mobile 390x844",
+        "issue": "On mobile viewport /month the body itself horizontally overflows (body.scrollWidth=478 vs clientWidth=390). The matrix container has overflow-auto but its parent card row is being stretched by the wide table so page-level horizontal scroll appears. Not a crash, but the header/side chrome shifts. Wrap the matrix card in a min-w-0 flex parent or set overflow-x-hidden on the outer container.",
+        "selector": "[data-testid='month-matrix']",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "URGENT: In /app/frontend/src/pages/Items.jsx add a saveCode function (mirror of Billing.jsx line 22-32) that calls api.updateItem(it.id, { ...it, code: newCode }) with try/catch that surfaces backend's Telugu duplicate-code detail via toast.error, then reloads items. This unblocks the 'custom shortcut codes editable' feature on the Items page.",
+    "MonthReport.jsx mobile: constrain outer wrapper so table scroll is contained; add min-w-0 to the flex/grid child holding the matrix card."
+  ],
+  "critical_code_review_comments": [
+    "Items.jsx: onBlur handler references undefined function (saveCode) — must be caught by lint/typescheck. Consider adding CI ESLint no-undef enforcement so this doesn't ship.",
+    "Items.jsx: even after fix, savePrice/saveStock have no try/catch — a failing PUT (e.g. backend 400) will silently succeed-toast; wrap in try/catch (same as Billing.saveCode).",
+    "MonthReport.jsx: `!q || i.code.includes(q.toLowerCase()) || i.name_te.includes(q)` — for Telugu names uses raw q, for code uses lowercased q. Consistent — OK. But no substring highlighting; minor UX.",
+    "server.py list_bills date range still uses tz-less string boundaries against tz-aware ISO strings — carried over from prev iterations; small edge risk around UTC midnight.",
+    "server.py update_stock: when both set_stock and add are supplied, set_stock is applied first then add is added — matches spec but not documented; consider Pydantic validator to reject both together for clarity."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml", "/app/test_reports/iteration_3.json"],
+  "success_rate": {"backend": "100% (18/18)", "frontend": "~90% — Items page blocked by saveCode ReferenceError; every other page verified working"},
+  "test_credentials": "admin@ushakirana.in / usha@123 (/app/memory/test_credentials.md)",
+  "seed_data_creation": "POST /api/seed invoked in pytest session and on Billing mount. New backend tests also seed extra bills/khata txns for stock/monthly/statement coverage — safe, uses seeded items.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend pytest covers 18 tests including new monthly-report per_day matrix, statement math, stock+auto-decrement, duplicate-code rejection. To retest Items.jsx after fix: log in via [data-testid=login-*], navigate [data-testid=nav-items], change [data-testid=item-code-a3] input to 'a3z' and Tab — expect no page-level red error overlay, expect item-code-a3z present, revert. Always add init script overriding window.print (Khata + MonthReport + Billing all call it). Bearer token accepted; frontend also stores it in localStorage under 'token'. Customer buttons use data-testid=customer-<uuid>."
+}
