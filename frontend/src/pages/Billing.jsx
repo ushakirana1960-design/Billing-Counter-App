@@ -1,9 +1,26 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { toast } from "sonner";
-import { Trash2, Printer, Plus, Search } from "lucide-react";
+import { Trash2, Printer, Search } from "lucide-react";
 import { api, rupee, MODE_TE } from "@/lib/api";
 import { toTelugu } from "@/lib/telugu";
 import Receipt from "@/components/Receipt";
+
+const getModeButtonClass = (mode, currentMode) => {
+  if (currentMode !== mode) {
+    return "border-slate-200 text-slate-600 hover:border-slate-400";
+  }
+  if (mode === "khata") {
+    return "bg-amber-500 border-amber-500 text-white";
+  }
+  return "bg-blue-600 border-blue-600 text-white";
+};
+
+const getCategoryButtonClass = (selected, current) => {
+  if (selected === current) {
+    return "bg-slate-900 text-white border-slate-900";
+  }
+  return "border-slate-200 text-slate-600 hover:border-slate-400";
+};
 
 export default function Billing() {
   const [items, setItems] = useState([]);
@@ -42,9 +59,9 @@ export default function Billing() {
     };
     window.addEventListener("keydown", onSlash);
     return () => window.removeEventListener("keydown", onSlash);
-  }, []);
+  }, [searchRef]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     await api.seed().catch(() => {});
     setItems(await api.items());
     setCustomers(await api.customers());
@@ -53,10 +70,11 @@ export default function Billing() {
       setStaff(s.staff);
       setBilledBy((b) => b || localStorage.getItem("uk_billed_by") || s.staff[0]);
     }
-  };
+  }, []);
+
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -299,9 +317,7 @@ export default function Billing() {
                   key={c}
                   data-testid={`cat-${c}`}
                   onClick={() => setCat(c)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${
-                    cat === c ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 text-slate-600 hover:border-slate-400"
-                  }`}
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${getCategoryButtonClass(cat, c)}`}
                 >
                   {c}
                 </button>
@@ -396,13 +412,7 @@ export default function Billing() {
                   key={m}
                   data-testid={`mode-${m}`}
                   onClick={() => setMode(m)}
-                  className={`py-2 rounded-md text-sm font-bold border-2 transition-colors ${
-                    mode === m
-                      ? m === "khata"
-                        ? "bg-amber-500 border-amber-500 text-white"
-                        : "bg-blue-600 border-blue-600 text-white"
-                      : "border-slate-200 text-slate-600 hover:border-slate-400"
-                  }`}
+                  className={`py-2 rounded-md text-sm font-bold border-2 transition-colors ${getModeButtonClass(m, mode)}`}
                 >
                   {MODE_TE[m]}
                 </button>

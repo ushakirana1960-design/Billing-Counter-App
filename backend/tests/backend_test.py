@@ -6,7 +6,9 @@ import requests
 BASE_URL = os.environ['REACT_APP_BACKEND_URL'].rstrip('/')
 API = f"{BASE_URL}/api"
 ADMIN_EMAIL = "admin@ushakirana.in"
-ADMIN_PASSWORD = "usha@123"
+ADMIN_PASSWORD = os.getenv("TEST_ADMIN_PASSWORD")
+if not ADMIN_PASSWORD:
+    raise RuntimeError("TEST_ADMIN_PASSWORD environment variable is required for backend tests")
 
 
 @pytest.fixture(scope="session")
@@ -120,7 +122,7 @@ class TestBulkPrice:
         r = client.post(f"{API}/items/bulk-price", json={"rows": rows, "dry_run": True})
         assert r.status_code == 200, r.text
         data = r.json()
-        assert data["dry_run"] is True
+        assert data["dry_run"] == True
         upd_codes = [u["code"] for u in data["updated"]]
         cre_codes = [u["code"] for u in data["created"]]
         assert "b2" in upd_codes

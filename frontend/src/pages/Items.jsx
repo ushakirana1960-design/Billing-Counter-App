@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { Trash2, Save, Plus, Zap, AlertTriangle } from "lucide-react";
 import { api, rupee } from "@/lib/api";
@@ -11,10 +11,10 @@ export default function Items() {
   const [form, setForm] = useState(EMPTY);
   const [q, setQ] = useState("");
 
-  const load = async () => setItems(await api.items());
+  const load = useCallback(async () => setItems(await api.items()), [api, setItems]);
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   const add = async () => {
     if (!form.code || !form.name_te) return toast.error("కోడ్ మరియు పేరు అవసరం");
@@ -328,8 +328,8 @@ function QuickRate({ items, onDone }) {
         </button>
         {log.length > 0 && (
           <div className="flex flex-wrap gap-2 ml-auto" data-testid="quick-rate-log">
-            {log.map((l, i) => (
-              <span key={i} className="text-xs bg-emerald-50 border border-emerald-200 rounded px-2 py-1 num">
+            {log.map((l) => (
+              <span key={l.code} className="text-xs bg-emerald-50 border border-emerald-200 rounded px-2 py-1 num">
                 {l.code}: {l.old} → {l.price}
               </span>
             ))}

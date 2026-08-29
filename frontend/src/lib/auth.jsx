@@ -1,10 +1,9 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import { API } from "@/lib/api";
 
 axios.defaults.withCredentials = true;
-const saved = localStorage.getItem("uk_token");
-if (saved) axios.defaults.headers.common.Authorization = `Bearer ${saved}`;
+// rely on httpOnly cookie set by backend; do not store auth tokens in localStorage
 
 const AuthCtx = createContext(null);
 export const useAuth = () => useContext(AuthCtx);
@@ -13,29 +12,36 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null); // null = checking, false = logged out
 
   useEffect(() => {
+    let mounted = true;
     const scale = localStorage.getItem("uk_ui_scale");
     if (scale) document.documentElement.style.fontSize = `${Number(scale) * 0.16}px`;
     axios
       .get(`${API}/auth/me`)
-      .then((r) => setUser(r.data))
-      .catch(() => setUser(false));
-  }, []);
+      .then((r) => {
+        if (mounted) setUser(r.data);
+      })
+      .catch(() => {
+        if (mounted) setUser(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [API, axios, localStorage, document, setUser]);
 
   const login = async (email, password) => {
-    const { data } = await axios.post(`${API}/auth/login`, { email, password });
-    localStorage.setItem("uk_token", data.access_token);
-    axios.defaults.headers.common.Authorization = `Bearer ${data.access_token}`;
-    setUser(data.user);
+    // backend sets httpOnly cookie; after successful login, fetch current user
+    await axios.post(`${API}/auth/login`, { email, password });
+    const { data } = await axios.get(`${API}/auth/me`);
+    setUser(data);
   };
 
   const logout = async () => {
     await axios.post(`${API}/auth/logout`).catch(() => {});
-    localStorage.removeItem("uk_token");
-    delete axios.defaults.headers.common.Authorization;
     setUser(false);
   };
 
-  return <AuthCtx.Provider value={{ user, login, logout }}>{children}</AuthCtx.Provider>;
+  const authValue = useMemo(() => ({ user, login, logout }), [user]);
+  return <AuthCtx.Provider value={authValue}>{children}</AuthCtx.Provider>;
 }
 
 export function formatApiError(detail) {

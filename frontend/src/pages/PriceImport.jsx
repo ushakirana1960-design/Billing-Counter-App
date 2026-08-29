@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { FileSpreadsheet, Eye, CheckCircle2, ArrowRight } from "lucide-react";
+import { FileSpreadsheet, Eye, CheckCircle2 } from "lucide-react";
 import { api, rupee } from "@/lib/api";
 
 const SAMPLE = `a1 540

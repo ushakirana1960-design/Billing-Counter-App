@@ -148,7 +148,7 @@ export default function Settings() {
         <div className="flex flex-wrap gap-2">
           {(shop.staff || []).map((s, i) => (
             <span
-              key={i}
+              key={s}
               data-testid={`staff-chip-${i}`}
               className="flex items-center gap-1 bg-slate-100 border border-slate-200 rounded-full pl-3 pr-1 py-1 text-sm font-semibold"
             >

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { UserPlus, IndianRupee, Printer } from "lucide-react";
 import { api, rupee, MODE_TE } from "@/lib/api";
@@ -20,7 +20,7 @@ export default function Khata() {
 
   useEffect(() => {
     api.settings().then(setShop).catch(() => {});
-  }, []);
+  }, [api, setShop]);
 
   const printStatement = async () => {
     const s = await api.statement(sel.id, month);
@@ -28,10 +28,10 @@ export default function Khata() {
     setTimeout(() => window.print(), 250);
   };
 
-  const load = async () => setCustomers(await api.customers());
+  const load = useCallback(async () => setCustomers(await api.customers()), [api, setCustomers]);
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   const open = async (c) => {
     setSel(c);

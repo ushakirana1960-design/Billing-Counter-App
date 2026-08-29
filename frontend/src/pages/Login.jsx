@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LogIn, Store } from "lucide-react";
+import { LogIn } from "lucide-react";
 import { useAuth, formatApiError } from "@/lib/auth";
 
 export default function Login() {
